@@ -1,0 +1,134 @@
+<!-- auth.js - Versão Corrigida com Redirecionamento -->
+<script>
+function register(email, password) {
+    console.log("Tentando registrar:", email);
+    
+    firebase.auth().createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            const user = userCredential.user;
+            console.log("Usuário criado:", user.uid);
+            
+            const userData = {
+                email: user.email,
+                createdAt: firebase.database.ServerValue.TIMESTAMP,
+                dispositivos: {}
+            };
+            
+            return firebase.database().ref('users/' + user.uid).set(userData)
+                .then(() => {
+                    console.log("Dados do usuário salvos no banco");
+                    alert("Cadastro realizado com sucesso!");
+                    // Redirecionar para a página de dispositivos após cadastro
+                    window.location.href = "dispositivos.html";
+                });
+        })
+        .catch(error => {
+            console.error("Erro completo no cadastro:", error);
+            alert("Erro: " + error.message);
+        });
+}
+
+function loginWithGoogle() {
+    console.log("Iniciando login com Google");
+    
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.addScope('email');
+    provider.addScope('profile');
+    
+    firebase.auth().signInWithPopup(provider)
+        .then((result) => {
+            console.log("Login com Google bem-sucedido", result.user);
+            
+            // Verificar se é um novo usuário
+            if (result.additionalUserInfo.isNewUser) {
+                const user = result.user;
+                const userData = {
+                    email: user.email,
+                    createdAt: firebase.database.ServerValue.TIMESTAMP,
+                    dispositivos: {}
+                };
+                
+                return firebase.database().ref('users/' + user.uid).set(userData)
+                    .then(() => {
+                        console.log("Dados do usuário Google salvos");
+                        // Redirecionar após salvar os dados
+                        window.location.href = "dispositivos.html";
+                    });
+            } else {
+                // Redirecionar usuários existentes
+                window.location.href = "dispositivos.html";
+            }
+        })
+        .catch(error => {
+            console.error("Erro completo no login com Google:", error);
+            alert("Erro no login com Google: " + error.message);
+        });
+}
+
+function login(email, password) {
+    console.log("Tentando login:", email);
+    
+    firebase.auth().signInWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            console.log("Login bem-sucedido:", userCredential.user.uid);
+            // Redirecionar para a página de dispositivos após login
+            window.location.href = "dispositivos.html";
+        })
+        .catch(error => {
+            console.error("Erro completo no login:", error);
+            alert("Login falhou: " + error.message);
+        });
+}
+
+function logout() {
+    console.log("Tentando logout");
+    
+    firebase.auth().signOut()
+        .then(() => {
+            console.log("Logout bem-sucedido");
+            // Redirecionar para a página de login após logout
+            window.location.href = "login.html";
+        })
+        .catch(error => {
+            console.error("Erro no logout:", error);
+        });
+}
+
+function addDeviceToUser(deviceCode, deviceName) {
+    const user = firebase.auth().currentUser;
+    
+    if (!user) {
+        console.error("Usuário não autenticado ao tentar adicionar dispositivo");
+        return Promise.reject("Usuário não autenticado");
+    }
+    
+    console.log("Adicionando dispositivo:", deviceCode, "para usuário:", user.uid);
+    
+    // Primeiro, adicionar à lista de dispositivos do usuário
+    return firebase.database().ref('users/' + user.uid + '/dispositivos/' + deviceCode).set(true)
+        .then(() => {
+            console.log("Dispositivo adicionado ao usuário");
+            
+            // Depois, verificar/criar informações do dispositivo
+            return firebase.database().ref('devices/' + deviceCode + '/info').once('value')
+                .then(snapshot => {
+                    if (!snapshot.exists()) {
+                        const deviceInfo = {
+                            nome: deviceName || `Dispositivo ${deviceCode}`,
+                            criado_em: firebase.database.ServerValue.TIMESTAMP,
+                            proprietario: user.uid
+                        };
+                        
+                        console.log("Criando informações do dispositivo:", deviceInfo);
+                        return firebase.database().ref('devices/' + deviceCode + '/info').set(deviceInfo);
+                    } else {
+                        console.log("Informações do dispositivo já existem");
+                    }
+                });
+        })
+        .catch(error => {
+            console.error("Erro completo ao adicionar dispositivo:", error);
+            throw error;
+        });
+}
+</script>

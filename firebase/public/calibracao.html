@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calibração de Sensores - BoxeIoT</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    .btn-loading {
+      position: relative;
+      color: transparent;
+    }
+    .btn-loading::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 20px;
+      height: 20px;
+      margin: -10px 0 0 -10px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .flash-message {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      animation: slideIn 0.3s ease-out;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .sensor-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-gap: 15px;
+      margin: 20px auto;
+      max-width: 300px;
+    }
+    .sensor {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background-color: #e5e7eb;
+      border: 2px solid #9ca3af;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 18px;
+      transition: all 0.3s;
+    }
+    .sensor.calibrated {
+      background-color: #10b981;
+      box-shadow: 0 0 20px #10b981;
+      color: white;
+    }
+    .sensor.active {
+      background-color: #f59e0b;
+      box-shadow: 0 0 20px #f59e0b;
+      color: white;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    .progress-bar {
+      width: 100%;
+      height: 20px;
+      background-color: #e5e7eb;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 20px 0;
+    }
+    .progress-fill {
+      height: 100%;
+      background-color: #3b82f6;
+      transition: width 0.3s;
+    }
+  </style>
+  <!-- Scripts do Firebase na ordem correta -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body class="flex flex-col min-h-screen">
+  <div class="container mx-auto flex-grow">
+    <!-- Cabeçalho -->
+    <div class="card p-6 mt-8 mb-8">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center">
+          <button onclick="goBack()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 mr-4">
+            &larr; Voltar
+          </button>
+          <h1 class="text-3xl font-bold text-gray-800">Calibração de Sensores</h1>
+        </div>
+        <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300">
+          Sair
+        </button>
+      </div>
+      
+      <!-- Status do dispositivo -->
+      <div id="deviceStatus" class="mt-4 p-4 rounded-lg">
+        <p class="font-medium">Status do dispositivo: <span id="statusValue">Conectando...</span></p>
+      </div>
+    </div>
+
+    <!-- Área principal -->
+    <div class="card p-6 mb-8">
+      <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Calibração dos Sensores</h2>
+      
+      <!-- Grid de sensores -->
+      <div class="sensor-grid" id="sensorGrid">
+        <!-- Os sensores serão gerados via JavaScript -->
+      </div>
+      
+      <!-- Barra de progresso -->
+      <div class="text-center mb-4">
+        <p class="text-gray-700 font-medium mb-2">Progresso da Calibração</p>
+        <div class="progress-bar">
+          <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+        </div>
+        <p id="progressText" class="text-gray-600">0/9 sensores calibrados</p>
+      </div>
+      
+      <!-- Instruções -->
+      <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+        <p class="text-yellow-700">
+          <strong>Instruções:</strong> Toque em cada sensor do saco de boxe conforme indicado. 
+          O sistema irá calibrar automaticamente cada sensor à medida que você os toca.
+        </p>
+      </div>
+      
+      <div class="flex justify-center gap-4 mb-4">
+        <button id="startBtn" onclick="startCalibration()" class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300">
+          Iniciar Calibração
+        </button>
+        <button id="stopBtn" onclick="stopCalibration()" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition duration-300" disabled>
+          Parar Calibração
+        </button>
+      </div>
+      
+      <div id="calibrationStatus" class="p-4 rounded-lg text-center hidden">
+        <p id="statusMessage"></p>
+      </div>
+    </div>
+  </div>
+
+  <footer class="text-center text-white py-4 mt-8">
+    <p>BoxeIoT &copy; 2023 - Sistema de Monitoramento de Sensores</p>
+  </footer>
+
+  <script>
+    // Variáveis para controle de estado
+    let isCalibrationActive = false;
+    let calibratedSensors = {};
+    let isRedirecting = false;
+    
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBLsU5CMvKQOm9Qs9mu6X1K27fVI8WuBQg",
+      authDomain: "boxeiot.firebaseapp.com",
+      databaseURL: "https://boxeiot-default-rtdb.firebaseio.com",
+      projectId: "boxeiot",
+      storageBucket: "boxeiot.firebasestorage.app",
+      messagingSenderId: "510231005229",
+      appId: "1:510231005229:web:13e764df17a953ff9d50a4",
+      measurementId: "G-0LP6HCJKGR"
+    };
+
+    // Inicializa o Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const database = firebase.database();
+
+    // Variáveis globais
+    let user = null;
+    let deviceCode = null;
+    let deviceRef = null;
+    let userDeviceRef = null;
+    let measurementRef = null;
+    let measurementListener = null;
+    let calibrationProgressRef = null;
+    let calibrationProgressListener = null;
+    let calibratedSensorsRef = null;
+    let calibratedSensorsListener = null;
+    let verifyConnectionInterval = null;
+
+    // Verificar autenticação
+    firebase.auth().onAuthStateChanged((currentUser) => {
+      if (!currentUser) {
+        window.location.href = "login.html";
+      } else {
+        user = currentUser;
+        
+        // Obter código do dispositivo da URL
+        const urlParams = new URLSearchParams(window.location.search);
+        deviceCode = urlParams.get('device');
+        
+        if (!deviceCode) {
+          showMessage('Dispositivo não especificado. Redirecionando...', true);
+          setTimeout(() => {
+            isRedirecting = true;
+            window.location.href = "index.html";
+          }, 2000);
+          return;
+        }
+        
+        // Inicializar conexão com o dispositivo
+        connectToDeviceWithLock();
+        
+        // Criar grid de sensores
+        createSensorGrid();
+        
+        // Iniciar verificação periódica de conexão
+        verifyConnectionInterval = setInterval(verifyDeviceConnection, 10000);
+      }
+    });
+
+    // Criar grid de sensores
+    function createSensorGrid() {
+      const sensorGrid = document.getElementById('sensorGrid');
+      sensorGrid.innerHTML = '';
+      
+      // Ordem dos sensores: direita (1,2,3), meio (4,5,6), esquerda (7,8,9)
+      const sensorOrder = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+      
+      sensorOrder.forEach(sensorId => {
+        const sensor = document.createElement('div');
+        sensor.className = 'sensor';
+        sensor.id = `sensor-${sensorId}`;
+        sensor.textContent = sensorId;
+        sensorGrid.appendChild(sensor);
+      });
+    }
+
+    // Conectar ao dispositivo com controle de acesso exclusivo
+    function connectToDeviceWithLock() {
+      deviceRef = database.ref("devices/" + deviceCode);
+      
+      // Verificar se o dispositivo está disponível usando transação atômica
+      deviceRef.transaction((currentData) => {
+        if (currentData === null) {
+          // Dispositivo não existe
+          return { estado: "inexistente" };
+        }
+        
+        if (currentData.estado === "ocupado" && currentData.usuario !== user.uid) {
+          // Dispositivo ocupado por outro usuário - não permitir acesso
+          return currentData; // Não altera os dados
+        }
+        
+        // Dispositivo disponível ou já ocupado pelo mesmo usuário
+        return {
+          ...currentData,
+          estado: "ocupado",
+          usuario: user.uid,
+          timestampConexao: firebase.database.ServerValue.TIMESTAMP
+        };
+      }, (error, committed, snapshot) => {
+        if (error) {
+          console.error("Erro na transação:", error);
+          showMessage("Erro ao conectar com o dispositivo.", true);
+          return;
+        }
+        
+        if (!committed) {
+          // Transação não comitada = dispositivo ocupado por outro usuário
+          showMessage("Dispositivo está sendo usado por outro usuário. Redirecionando...", true);
+          setTimeout(() => {
+            isRedirecting = true;
+            window.location.href = "index.html";
+          }, 2000);
+          return;
+        }
+        
+        // Conexão bem-sucedida
+        const data = snapshot.val();
+        updateDeviceStatus(data.estado);
+        console.log("Usuário conectado ao dispositivo com sucesso");
+        
+        // Configurar referência para medições
+        measurementRef = database.ref("devices/" + deviceCode + "/medicoes");
+        
+        // Configurar referência para progresso de calibração
+        calibrationProgressRef = database.ref("devices/" + deviceCode + "/medicoes/progressoCalibracao");
+        calibratedSensorsRef = database.ref("devices/" + deviceCode + "/medicoes/sensoresCalibrados");
+        
+        // Monitorar progresso da calibração
+        setupCalibrationListeners();
+        
+        // Registrar usuário na lista de conexões
+        userDeviceRef = database.ref("devices/" + deviceCode + "/usuarios/" + user.uid);
+        userDeviceRef.set(firebase.database.ServerValue.TIMESTAMP)
+          .then(() => {
+            console.log("Usuário registrado no dispositivo");
+          })
+          .catch(error => {
+            console.error("Erro ao registrar usuário:", error);
+          });
+      });
+    }
+
+    // Configurar listeners para a calibração
+    function setupCalibrationListeners() {
+      // Monitorar medições
+      measurementListener = measurementRef.on('value', (snapshot) => {
+        const measurement = snapshot.val();
+        if (measurement && measurement.usuario === user.uid) {
+          processMeasurementUpdate(measurement);
+        }
+      });
+      
+      // Monitorar progresso da calibração
+      calibrationProgressListener = calibrationProgressRef.on('value', (snapshot) => {
+        const progress = snapshot.val();
+        if (progress) {
+          updateCalibrationProgress(progress.completos, progress.total, progress.percentual);
+        }
+      });
+      
+      // Monitorar sensores calibrados
+      calibratedSensorsListener = calibratedSensorsRef.on('value', (snapshot) => {
+        const sensors = snapshot.val() || {};
+        updateCalibratedSensors(sensors);
+      });
+    }
+
+    // Processar atualização de medição
+    function processMeasurementUpdate(measurement) {
+      switch(measurement.estado) {
+        case "solicitada":
+          updateCalibrationStatus("Calibração solicitada. Aguardando dispositivo...", "info");
+          break;
+        case "executando":
+          updateCalibrationStatus("Calibração em andamento. Toque nos sensores conforme solicitado.", "warning");
+          break;
+        case "concluida":
+          updateCalibrationStatus("Calibração concluída com sucesso!", "success");
+          isCalibrationActive = false;
+          document.getElementById('startBtn').disabled = false;
+          document.getElementById('stopBtn').disabled = true;
+          break;
+      }
+    }
+
+    // Atualizar progresso da calibração
+    function updateCalibrationProgress(completed, total, percent) {
+      document.getElementById('progressFill').style.width = percent + '%';
+      document.getElementById('progressText').textContent = `${completed}/${total} sensores calibrados (${percent}%)`;
+    }
+
+    // Atualizar sensores calibrados na UI
+    function updateCalibratedSensors(sensors) {
+      // Atualizar objeto interno
+      calibratedSensors = sensors;
+      
+      // Atualizar interface
+      for (let i = 1; i <= 9; i++) {
+        const sensorElement = document.getElementById(`sensor-${i}`);
+        if (sensors[i]) {
+          sensorElement.classList.add('calibrated');
+          sensorElement.classList.remove('active');
+        } else {
+          sensorElement.classList.remove('calibrated');
+        }
+      }
+    }
+
+    // Iniciar calibração
+    function startCalibration() {
+      if (!deviceCode) {
+        showMessage('Nenhum dispositivo selecionado.', true);
+        return;
+      }
+      
+      // Verificar se ainda temos acesso ao dispositivo
+      deviceRef.once('value').then(snapshot => {
+        const deviceData = snapshot.val();
+        
+        if (!deviceData || deviceData.estado !== "ocupado" || deviceData.usuario !== user.uid) {
+          showMessage("Você perdeu o acesso ao dispositivo. Redirecionando...", true);
+          setTimeout(() => {
+            isRedirecting = true;
+            window.location.href = "index.html";
+          }, 2000);
+          return;
+        }
+        
+        // Limpar estado anterior
+        calibratedSensors = {};
+        updateCalibratedSensors({});
+        updateCalibrationProgress(0, 9, 0);
+        
+        // Ativar estado de calibração
+        isCalibrationActive = true;
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+        
+        // Solicitar calibração
+        solicitarCalibracao();
+      });
+    }
+
+    // Parar calibração
+    function stopCalibration() {
+      isCalibrationActive = false;
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+      
+      // Enviar comando de parada
+      database.ref("devices/" + deviceCode + "/medicoes/comando").set("parar")
+        .then(() => {
+          console.log("Comando de parada enviado");
+        })
+        .catch(error => {
+          console.error("Erro ao enviar comando de parada:", error);
+        });
+      
+      updateCalibrationStatus("Calibração interrompida.", "info");
+    }
+
+    // Solicitar calibração
+    function solicitarCalibracao() {
+      if (!isCalibrationActive || !deviceCode) {
+        return;
+      }
+      
+      // Solicitar calibração
+      const measurementData = {
+        tipo: "tCalibrar",
+        estado: "solicitada",
+        usuario: user.uid,
+        timestampSolicitacao: firebase.database.ServerValue.TIMESTAMP
+      };
+      
+      measurementRef.set(measurementData)
+        .then(() => {
+          console.log("Calibração solicitada");
+          updateCalibrationStatus("Calibração iniciada. Toque nos sensores...", "warning");
+        })
+        .catch(error => {
+          console.error("Erro ao solicitar calibração:", error);
+          showMessage("Erro ao conectar com o dispositivo. Verifique a conexão e tente novamente.", true);
+          // Tentar novamente após 2 segundos
+          if (isCalibrationActive) {
+            setTimeout(() => solicitarCalibracao(), 2000);
+          }
+        });
+    }
+
+    // Atualizar status da calibração na UI
+    function updateCalibrationStatus(message, type = "info") {
+      const statusElement = document.getElementById('calibrationStatus');
+      const statusMessage = document.getElementById('statusMessage');
+      
+      statusMessage.textContent = message;
+      statusElement.classList.remove('hidden', 'bg-blue-100', 'text-blue-800', 'bg-yellow-100', 'text-yellow-800', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+      
+      if (type === "info") {
+        statusElement.classList.add('bg-blue-100', 'text-blue-800');
+      } else if (type === "warning") {
+        statusElement.classList.add('bg-yellow-100', 'text-yellow-800');
+      } else if (type === "success") {
+        statusElement.classList.add('bg-green-100', 'text-green-800');
+      } else if (type === "error") {
+        statusElement.classList.add('bg-red-100', 'text-red-800');
+      }
+      
+      statusElement.classList.remove('hidden');
+    }
+
+    // Atualizar status do dispositivo na UI
+    function updateDeviceStatus(status) {
+      const statusElement = document.getElementById('deviceStatus');
+      const statusValue = document.getElementById('statusValue');
+      
+      statusValue.textContent = status;
+      
+      // Atualizar classe com base no status
+      statusElement.className = "mt-4 p-4 rounded-lg ";
+      
+      switch(status) {
+        case "disponivel":
+          statusElement.classList.add("bg-green-100", "text-green-800");
+          break;
+        case "ocupado":
+          statusElement.classList.add("bg-blue-100", "text-blue-800");
+          break;
+        case "manutencao":
+          statusElement.classList.add("bg-yellow-100", "text-yellow-800");
+          break;
+        default:
+          statusElement.classList.add("bg-gray-100", "text-gray-800");
+      }
+    }
+
+    // Verificar conexão do dispositivo
+    function verifyDeviceConnection() {
+      if (!deviceCode || !user) {
+        if (verifyConnectionInterval) {
+          clearInterval(verifyConnectionInterval);
+          verifyConnectionInterval = null;
+        }
+        return;
+      }
+      
+      database.ref("devices/" + deviceCode).once('value')
+        .then(snapshot => {
+          const deviceData = snapshot.val();
+          
+          if (!deviceData) {
+            showMessage('Dispositivo não encontrado. Redirecionando...', true);
+            redirectToIndex();
+            return;
+          }
+          
+          if (deviceData.usuario && deviceData.usuario !== user.uid) {
+            showMessage('Dispositivo está sendo usado por outro usuário. Redirecionando...', true);
+            redirectToIndex();
+          }
+        })
+        .catch(error => {
+          console.error("Erro ao verificar conexão do dispositivo:", error);
+        });
+    }
+
+    function redirectToIndex() {
+      if (verifyConnectionInterval) {
+        clearInterval(verifyConnectionInterval);
+        verifyConnectionInterval = null;
+      }
+      setTimeout(() => {
+        isRedirecting = true;
+        window.location.href = "index.html";
+      }, 2000);
+    }
+
+    // Função para exibir mensagens
+    function showMessage(text, isError = false) {
+      // Criar elemento de mensagem se não existir
+      let messageElement = document.getElementById('flashMessage');
+      
+      if (!messageElement) {
+        messageElement = document.createElement('div');
+        messageElement.id = 'flashMessage';
+        messageElement.className = 'flash-message';
+        document.body.appendChild(messageElement);
+      }
+      
+      messageElement.textContent = text;
+      messageElement.className = 'flash-message';
+      
+      if (isError) {
+        messageElement.classList.add('bg-red-500', 'text-white');
+      } else {
+        messageElement.classList.add('bg-green-500', 'text-white');
+      }
+      
+      // Mostrar a mensagem
+      messageElement.style.display = 'block';
+      
+      setTimeout(() => {
+        messageElement.style.display = 'none';
+      }, 5000);
+    }
+
+    // Voltar para a página anterior
+    function goBack() {
+      // Parar calibração se estiver ativa
+      if (isCalibrationActive) {
+        stopCalibration();
+      }
+      
+      isRedirecting = true;
+      window.location.href = "index.html";
+    }
+
+    // Função de logout
+    function logout() {
+      // Parar calibração se estiver ativa
+      if (isCalibrationActive) {
+        stopCalibration();
+      }
+      
+      // Parar verificação de conexão
+      if (verifyConnectionInterval) {
+        clearInterval(verifyConnectionInterval);
+        verifyConnectionInterval = null;
+      }
+      
+      // Remover listeners
+      if (deviceRef) deviceRef.off();
+      if (userDeviceRef) userDeviceRef.off();
+      if (measurementListener) measurementRef.off('value', measurementListener);
+      if (calibrationProgressListener) calibrationProgressRef.off('value', calibrationProgressListener);
+      if (calibratedSensorsListener) calibratedSensorsRef.off('value', calibratedSensorsListener);
+      
+      // Liberar dispositivo
+      if (deviceCode && user) {
+        // Verificar se ainda somos os proprietários antes de liberar
+        deviceRef.once('value').then(snapshot => {
+          const deviceData = snapshot.val();
+          if (deviceData && deviceData.usuario === user.uid) {
+            deviceRef.update({
+              estado: "disponivel",
+              usuario: null
+            });
+          }
+          
+          // Remover usuário da lista de conexões
+          database.ref("devices/" + deviceCode + "/usuarios/" + user.uid).remove();
+        }).catch(error => {
+          console.error("Erro ao liberar dispositivo:", error);
+        });
+      }
+      
+      // Fazer logout
+      firebase.auth().signOut()
+        .then(() => {
+          isRedirecting = true;
+          window.location.href = "login.html";
+        })
+        .catch(error => {
+          console.error("Erro no logout:", error);
+        });
+    }
+
+    // Liberar recursos quando a página for fechada/recarregada
+    window.addEventListener('beforeunload', () => {
+      if (!isRedirecting && deviceCode && user) {
+        // Parar calibração se estiver ativa
+        if (isCalibrationActive) {
+          stopCalibration();
+        }
+        
+        // Verificar se ainda somos os proprietários antes de liberar
+        deviceRef.once('value').then(snapshot => {
+          const deviceData = snapshot.val();
+          if (deviceData && deviceData.usuario === user.uid) {
+            deviceRef.update({
+              estado: "disponivel",
+              usuario: null
+            });
+          }
+          
+          // Remover usuário da lista de conexões
+          database.ref("devices/" + deviceCode + "/usuarios/" + user.uid).remove();
+        }).catch(error => {
+          console.error("Erro ao liberar dispositivo:", error);
+        });
+      }
+    });
+
+    // Verificar se o Firebase foi carregado corretamente
+    if (typeof firebase === 'undefined') {
+      showMessage('Erro: Firebase não carregado. Recarregue a página.', true);
+      console.error('Firebase não carregado!');
+    } else {
+      console.log('Firebase carregado com sucesso');
+    }
+  </script>
+</body>
+</html>

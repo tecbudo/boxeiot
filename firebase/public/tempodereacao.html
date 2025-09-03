@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tempo de Reação - BoxeIoT</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    .btn-loading {
+      position: relative;
+      color: transparent;
+    }
+    .btn-loading::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 20px;
+      height: 20px;
+      margin: -10px 0 0 -10px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .timer-display {
+      font-size: 4rem;
+      font-weight: bold;
+      text-align: center;
+      margin: 2rem 0;
+      color: #1a2a6c;
+    }
+    .result-item {
+      transition: all 0.3s;
+    }
+    .result-item:hover {
+      background-color: #f0f0f0;
+    }
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    .flash-message {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      animation: slideIn 0.3s ease-out;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .status-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .status-disponivel { background-color: #10B981; }
+    .status-ocupado { background-color: #3B82F6; }
+    .status-manutencao { background-color: #F59E0B; }
+    .status-desconhecido { background-color: #9CA3AF; }
+  </style>
+  <!-- Scripts do Firebase na ordem correta -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="flex flex-col min-h-screen">
+  <div class="container mx-auto flex-grow">
+    <!-- Cabeçalho -->
+    <div class="card p-6 mt-8 mb-8">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center">
+          <button onclick="goBack()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 mr-4">
+            &larr; Voltar
+          </button>
+          <h1 class="text-3xl font-bold text-gray-800">Tempo de Reação</h1>
+        </div>
+        <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300">
+          Sair
+        </button>
+      </div>
+      
+      <!-- Status do dispositivo -->
+      <div id="deviceStatus" class="mt-4 p-4 rounded-lg">
+        <p class="font-medium">Status do dispositivo: <span id="statusValue">Conectando...</span></p>
+      </div>
+    </div>
+
+    <!-- Área principal -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <!-- Painel de controle -->
+      <div class="card p-6">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Medição de Tempo de Reação</h2>
+        
+        <div class="timer-display" id="timerDisplay">
+          --:--
+        </div>
+        
+        <div class="flex justify-center gap-4 mb-6">
+          <button id="startBtn" onclick="solicitarMedicao()" class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300">
+            Iniciar Medição
+          </button>
+          <button id="resetBtn" onclick="resetMeasurement()" class="bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-700 transition duration-300" disabled>
+            Reiniciar
+          </button>
+        </div>
+        
+        <div id="measurementStatus" class="p-4 rounded-lg text-center hidden">
+          <p id="statusMessage"></p>
+        </div>
+        
+        <div id="resultDisplay" class="p-4 rounded-lg bg-green-100 text-green-800 text-center hidden">
+          <p class="font-bold">Tempo de reação: <span id="resultTime">0</span> segundos</p>
+        </div>
+      </div>
+      
+      <!-- Histórico de resultados -->
+      <div class="card p-6">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Histórico de Medições</h2>
+        
+        <div class="mb-4 flex justify-between items-center">
+          <span class="text-gray-700 font-medium">
+            Total: <span id="resultsCount">0</span> medições
+          </span>
+          <button onclick="clearAllResults()" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition duration-300 text-sm">
+            Limpar Tudo
+          </button>
+        </div>
+        
+        <div id="resultsList" class="overflow-y-auto max-h-96">
+          <p class="text-gray-500 text-center py-8">Nenhuma medição realizada ainda.</p>
+        </div>
+      </div>
+      <!-- Gráfico de Histórico de Tempo de Reação -->
+<div class="card p-6 mt-6">
+  <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Histórico de Tempos de Reação</h2>
+  <div class="chart-container" style="position: relative; height: 400px;">
+    <canvas id="reactionTimeChart"></canvas>
+  </div>
+</div>
+      
+      
+    </div>
+  </div>
+
+  <footer class="text-center text-white py-4 mt-8">
+    <p>BoxeIoT &copy; 2023 - Sistema de Monitoramento de Sensores</p>
+  </footer>
+
+  <script>
+	let currentMeasurementState = null;
+    let measurementTimeout = null;  
+    // Variável para controlar redirecionamentos
+    let isRedirecting = false;
+    let reactionTimeChart = null;
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBLsU5CMvKQOm9Qs9mu6X1K27fVI8WuBQg",
+      authDomain: "boxeiot.firebaseapp.com",
+      databaseURL: "https://boxeiot-default-rtdb.firebaseio.com",
+      projectId: "boxeiot",
+      storageBucket: "boxeiot.firebasestorage.app",
+      messagingSenderId: "510231005229",
+      appId: "1:510231005229:web:13e764df17a953ff9d50a4",
+      measurementId: "G-0LP6HCJKGR"
+    };
+
+    // Inicializa o Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const database = firebase.database();
+
+    // Variáveis globais
+    let user = null;
+    let deviceCode = null;
+    let deviceRef = null;
+    let userDeviceRef = null;
+    let measurementRef = null;
+    let measurementListener = null;
+    let resultsRef = null;
+    let resultsListener = null;
+    let currentMeasurementId = null;
+    let verifyConnectionInterval = null;
+    let timerInterval = null;
+    let startTime = null;
+
+    // Verificar autenticação
+    firebase.auth().onAuthStateChanged((currentUser) => {
+      if (!currentUser) {
+        window.location.href = "login.html";
+      } else {
+        user = currentUser;
+        
+        // Obter código do dispositivo da URL
+        const urlParams = new URLSearchParams(window.location.search);
+        deviceCode = urlParams.get('device');
+        
+        if (!deviceCode) {
+          showMessage('Dispositivo não especificado. Redirecionando...', true);
+          setTimeout(() => {
+            isRedirecting = true;
+            window.location.href = "index.html";
+          }, 2000);
+          return;
+        }
+        
+        // Inicializar conexão com o dispositivo
+        connectToDeviceWithLock();
+        
+        // Carregar histórico de resultados
+        loadResultsHistory();
+        
+        // Iniciar verificação periódica de conexão
+        verifyConnectionInterval = setInterval(verifyDeviceConnection, 10000);
+      }
+    });
+
+    // Conectar ao dispositivo com controle de acesso exclusivo
+    function connectToDeviceWithLock() {
+      deviceRef = database.ref("devices/" + deviceCode);
+      
+      // Verificar se o dispositivo está disponível usando transação atômica
+      deviceRef.transaction((currentData) => {
+        if (currentData === null) {
+          // Dispositivo não existe
+          return { estado: "inexistente" };
+        }
+        
+        if (currentData.estado === "ocupado" && currentData.usuario !== user.uid) {
+          // Dispositivo ocupado por outro usuário - não permitir acesso
+          return currentData; // Não altera os dados
+        }
+        
+        // Dispositivo disponível ou já ocupado pelo mesmo usuário
+        return {
+          ...currentData,
+          estado: "ocupado",
+          usuario: user.uid,
+          timestampConexao: firebase.database.ServerValue.TIMESTAMP
+        };
+      }, (error, committed, snapshot) => {
+        if (error) {
+          console.error("Erro na transação:", error);
+          showMessage("Erro ao conectar com o dispositivo.", true);
+          return;
+        }
+        
+        if (!committed) {
+          // Transação não comitada = dispositivo ocupado por outro usuário
+          showMessage("Dispositivo está sendo usado por outro usuário. Redirecionando...", true);
+          setTimeout(() => {
+            isRedirecting = true;
+            window.location.href = "index.html";
+          }, 2000);
+          return;
+        }
+        
+        // Conexão bem-sucedida
+        const data = snapshot.val();
+        updateDeviceStatus(data.estado);
+        console.log("Usuário conectado ao dispositivo com sucesso");
+        
+        // Configurar referência para medições
+        measurementRef = database.ref("devices/" + deviceCode + "/medicoes");
+        
+        // Monitorar medições
+        measurementListener = measurementRef.on('value', (snapshot) => {
+          const measurement = snapshot.val();
+          if (measurement && measurement.usuario === user.uid) {
+            processMeasurementUpdate(measurement);
+          }else {
+    // não há medição ativa → limpar interface
+    resetMeasurement();
+  }
+        });
+        
+        // Registrar usuário na lista de conexões
+        userDeviceRef = database.ref("devices/" + deviceCode + "/usuarios/" + user.uid);
+        userDeviceRef.set(firebase.database.ServerValue.TIMESTAMP)
+          .then(() => {
+            console.log("Usuário registrado no dispositivo");
+          })
+          .catch(error => {
+            console.error("Erro ao registrar usuário:", error);
+          });
+      });
+    }
+
+    // Processar atualização de medição
+ function processMeasurementUpdate(measurement) {
+  // Limpar timeout se a medição começou - DEVE VIR PRIMEIRO
+  if (measurement.estado === "executando" && measurementTimeout) {
+    clearTimeout(measurementTimeout);
+    measurementTimeout = null;
+  }
+  
+  currentMeasurementState = measurement.estado; // Atualizar estado DEPOIS
+  
+  switch(measurement.estado) {
+    case "solicitada":
+      updateMeasurementStatus("Medição solicitada. Aguardando dispositivo...", "info");
+      break;
+    case "executando":
+      updateMeasurementStatus("Medição em andamento...", "warning");
+      startVisualTimer();
+      break;
+    case "concluida":
+      if (measurement.valor) {
+        stopVisualTimer();   
+        showResult(measurement.valor);
+        saveUserResult(measurement.valor);
+        // Limpar medição após processar
+        measurementRef.remove();
+        currentMeasurementState = null;
+      }
+      break;
+  }
+}
+
+    // Solicitar medição
+  function solicitarMedicao() {
+  if (!deviceCode) {
+    showMessage('Nenhum dispositivo selecionado.', true);
+    return;
+  }
+
+  // Verificar explicitamente o estado do dispositivo antes de solicitar
+  deviceRef.once('value').then(snapshot => {
+    const deviceData = snapshot.val();
+    
+    if (!deviceData || deviceData.estado !== "ocupado" || deviceData.usuario !== user.uid) {
+      // Tentar reconectar se perdemos o acesso
+      connectToDeviceWithLock();
+      showMessage("Reconectando ao dispositivo...", false);
+      return;
+    }
+
+    // Resto do código para solicitar medição...
+    const measurementData = {
+      tipo: "tempo_reacao",
+      estado: "solicitada",
+      usuario: user.uid,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    };
+
+    measurementRef.set(measurementData)
+      .then(() => {
+        console.log("Medição solicitada");
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('resetBtn').disabled = false;
+        currentMeasurementState = "solicitada";
+        
+        // Resetar timeout
+        if (measurementTimeout) clearTimeout(measurementTimeout);
+        measurementTimeout = setTimeout(() => {
+          if (currentMeasurementState === "solicitada") {
+            showMessage("Dispositivo não respondeu. Tente novamente.", true);
+            resetMeasurement();
+          }
+        }, 10000);
+      })
+      .catch(error => {
+        console.error("Erro ao solicitar medição:", error);
+        showMessage("Erro ao conectar com o dispositivo. Verifique a conexão e tente novamente.", true);
+      });
+  });
+}
+
+    // Atualizar status da medição na UI
+    function updateMeasurementStatus(message, type = "info") {
+      const statusElement = document.getElementById('measurementStatus');
+      const statusMessage = document.getElementById('statusMessage');
+      
+      statusMessage.textContent = message;
+      statusElement.classList.remove('hidden', 'bg-blue-100', 'text-blue-800', 'bg-yellow-100', 'text-yellow-800', 'bg-green-100', 'text-green-800');
+      
+      if (type === "info") {
+        statusElement.classList.add('bg-blue-100', 'text-blue-800');
+      } else if (type === "warning") {
+        statusElement.classList.add('bg-yellow-100', 'text-yellow-800');
+      } else if (type === "success") {
+        statusElement.classList.add('bg-green-100', 'text-green-800');
+      }
+      
+      statusElement.classList.remove('hidden');
+    }
+
+    // Mostrar resultado
+  function showResult(time) {
+  // PARAR CONTADOR VISUAL IMEDIATAMENTE
+  stopVisualTimer();
+  document.getElementById('resultTime').textContent = time.toFixed(3);
+  document.getElementById('resultDisplay').classList.remove('hidden');
+  document.getElementById('measurementStatus').classList.add('hidden');
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('resetBtn').disabled = false;
+  
+  updateMeasurementStatus(`Medição concluída: ${time.toFixed(3)} segundos`, "success");
+  setTimeout(() => {
+    document.getElementById('measurementStatus').classList.add('hidden');
+  }, 5000);
+}
+    // Salvar resultado no histórico do usuário
+    function saveUserResult(time) {
+      const resultData = {
+        valor: time,
+        timestamp: firebase.database.ServerValue.TIMESTAMP,
+        dispositivo: deviceCode
+      };
+      
+      database.ref('users/' + user.uid + '/medicoes/tempo_reacao/' + new Date().getTime()).set(resultData)
+        .then(() => {
+          console.log("Resultado salvo no histórico do usuário");
+        })
+        .catch(error => {
+          console.error("Erro ao salvar resultado:", error);
+        });
+    }
+
+    // Reiniciar medição
+  function resetMeasurement() {
+  console.log("Reiniciando medição...");
+  
+  // 1. Limpar timeout se existir
+  if (measurementTimeout) {
+    clearTimeout(measurementTimeout);
+    measurementTimeout = null;
+  }
+  
+  // 2. Cancelar medição no Firebase se ainda estiver ativa
+  if (currentMeasurementState === "solicitada" || currentMeasurementState === "executando") {
+    console.log("Cancelando medição no Firebase...");
+    
+    // Remover a solicitação de medição do Firebase
+    measurementRef.remove().catch(error => {
+      console.error("Erro ao cancelar medição:", error);
+    });
+    
+    // Verificar se precisamos liberar o dispositivo
+    deviceRef.once('value').then(snapshot => {
+      const deviceData = snapshot.val();
+      if (deviceData && deviceData.usuario === user.uid) {
+        // Manter dispositivo ocupado mas sem medição ativa
+        deviceRef.update({
+          estado: "ocupado",
+          usuario: user.uid
+        });
+      }
+    });
+  }
+  
+  // 3. Resetar estado local
+  currentMeasurementState = null;
+  
+  // 4. Reativar interface
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('resetBtn').disabled = true;
+  document.getElementById('measurementStatus').classList.add('hidden');
+  document.getElementById('resultDisplay').classList.add('hidden');
+  
+  // 5. Parar temporizador visual
+  stopVisualTimer();
+  document.getElementById('timerDisplay').textContent = "--:--";
+  
+  console.log("Medição reiniciada com sucesso");
+}
+    // Temporizador visual
+    function startVisualTimer() {
+	  
+     if (timerInterval) {
+        clearInterval(timerInterval);
+    } 	
+      startTime = new Date().getTime();
+      timerInterval = setInterval(updateTimerDisplay, 10);
+    }
+    
+    function stopVisualTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+    }
+    
+    function updateTimerDisplay() {
+      const currentTime = new Date().getTime();
+      const elapsed = (currentTime - startTime) / 1000;
+      document.getElementById('timerDisplay').textContent = elapsed.toFixed(3);
+    }
+
+    // Atualizar status do dispositivo na UI
+    function updateDeviceStatus(status) {
+      const statusElement = document.getElementById('deviceStatus');
+      const statusValue = document.getElementById('statusValue');
+      
+      statusValue.textContent = status;
+      
+      // Atualizar classe com base no status
+      statusElement.className = "mt-4 p-4 rounded-lg ";
+      
+      switch(status) {
+        case "disponivel":
+          statusElement.classList.add("bg-green-100", "text-green-800");
+          break;
+        case "ocupado":
+          statusElement.classList.add("bg-blue-100", "text-blue-800");
+          break;
+        case "manutencao":
+          statusElement.classList.add("bg-yellow-100", "text-yellow-800");
+          break;
+        default:
+          statusElement.classList.add("bg-gray-100", "text-gray-800");
+      }
+    }
+
+    // Verificar conexão do dispositivo
+    function verifyDeviceConnection() {
+      if (!deviceCode || !user) {
+        if (verifyConnectionInterval) {
+          clearInterval(verifyConnectionInterval);
+          verifyConnectionInterval = null;
+        }
+        return;
+      }
+      
+      database.ref("devices/" + deviceCode).once('value')
+        .then(snapshot => {
+          const deviceData = snapshot.val();
+          
+          if (!deviceData) {
+            showMessage('Dispositivo não encontrado. Redirecionando...', true);
+            redirectToIndex();
+            return;
+          }
+          
+          if (deviceData.usuario && deviceData.usuario !== user.uid) {
+            showMessage('Dispositivo está sendo usado por outro usuário. Redirecionando...', true);
+            redirectToIndex();
+          }
+        })
+        .catch(error => {
+          console.error("Erro ao verificar conexão do dispositivo:", error);
+        });
+    }
+
+    function redirectToIndex() {
+      if (verifyConnectionInterval) {
+        clearInterval(verifyConnectionInterval);
+        verifyConnectionInterval = null;
+      }
+      setTimeout(() => {
+        isRedirecting = true;
+        window.location.href = "index.html";
+      }, 2000);
+    }
+
+    // Carregar histórico de resultados
+   function loadResultsHistory() {
+  resultsRef = database.ref('users/' + user.uid + '/medicoes/tempo_reacao');
+  
+  resultsListener = resultsRef.orderByChild('timestamp').on('value', (snapshot) => {
+    const results = snapshot.val() || {};
+    const resultsList = document.getElementById('resultsList');
+    const resultsCount = document.getElementById('resultsCount');
+    
+    resultsCount.textContent = Object.keys(results).length;
+    
+    if (Object.keys(results).length === 0) {
+      resultsList.innerHTML = '<p class="text-gray-500 text-center py-8">Nenhuma medição realizada ainda.</p>';
+      // Limpar gráfico se não houver dados
+      if (reactionTimeChart) {
+        reactionTimeChart.destroy();
+        reactionTimeChart = null;
+      }
+      return;
+    }
+    
+    // Ordenar resultados por timestamp (mais recente primeiro)
+    const sortedResults = Object.entries(results)
+      .map(([key, value]) => ({ key, ...value }))
+      .sort((a, b) => b.timestamp - a.timestamp);
+    
+    // Limpar e preencher lista
+    resultsList.innerHTML = '';
+    
+    sortedResults.forEach(result => {
+      const resultElement = document.createElement('div');
+      resultElement.className = 'result-item p-4 border-b border-gray-200 flex justify-between items-center';
+      
+      const date = new Date(result.timestamp);
+      const formattedDate = date.toLocaleString('pt-BR');
+      
+      resultElement.innerHTML = `
+        <div>
+          <p class="font-semibold">${result.valor.toFixed(3)} segundos</p>
+          <p class="text-sm text-gray-500">${formattedDate}</p>
+          ${result.dispositivo ? `<p class="text-sm text-gray-500">Dispositivo: ${result.dispositivo}</p>` : ''}
+        </div>
+        <button onclick="deleteResult('${result.key}')" class="text-red-600 hover:text-red-800">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          </svg>
+        </button>
+      `;
+      
+      resultsList.appendChild(resultElement);
+    });
+    
+    // Atualizar gráfico com os resultados
+    updateReactionTimeChart(results);
+  });
+}
+
+function updateReactionTimeChart(results) {
+  const ctx = document.getElementById('reactionTimeChart').getContext('2d');
+  
+  // Converter resultados para array e ordenar por timestamp
+  const resultsArray = Object.entries(results)
+    .map(([key, value]) => ({ key, ...value }))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  
+  // Preparar dados para o gráfico
+  const labels = resultsArray.map(result => {
+    const date = new Date(result.timestamp);
+    return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+  });
+  
+  const data = resultsArray.map(result => result.valor);
+  
+  // Destruir gráfico anterior se existir
+  if (reactionTimeChart) {
+    reactionTimeChart.destroy();
+  }
+  
+  // Criar novo gráfico
+  reactionTimeChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Tempo de Reação (s)',
+        data: data,
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+        tension: 0.1,
+        fill: true,
+        pointBackgroundColor: 'rgb(75, 192, 192)',
+        pointRadius: 4,
+        pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Tempo (segundos)'
+          }
+        },
+        x: {
+          ticks: {
+            maxRotation: 45,
+            minRotation: 45
+          }
+        }
+      },
+      plugins: {
+        title: {
+          display: true,
+          text: 'Evolução dos Tempos de Reação'
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return `Tempo: ${context.parsed.y.toFixed(3)}s`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+    // Excluir resultado individual
+  function deleteResult(resultKey) {
+  if (confirm('Tem certeza que deseja excluir este resultado?')) {
+    database.ref('users/' + user.uid + '/medicoes/tempo_reacao/' + resultKey).remove()
+      .then(() => {
+        console.log("Resultado excluído");
+        // O gráfico será atualizado automaticamente pelo listener
+      })
+      .catch(error => {
+        console.error("Erro ao excluir resultado:", error);
+        showMessage("Erro ao excluir resultado.", true);
+      });
+  }
+}
+
+    // Limpar todos os resultados
+ function clearAllResults() {
+  if (confirm('Tem certeza que deseja excluir todos os resultados? Esta ação não pode ser desfeita.')) {
+    database.ref('users/' + user.uid + '/medicoes/tempo_reacao').remove()
+      .then(() => {
+        console.log("Todos os resultados foram excluídos");
+        showMessage("Todos os resultados foram excluídos.", false);
+        
+        // Limpar gráfico
+        if (reactionTimeChart) {
+          reactionTimeChart.destroy();
+          reactionTimeChart = null;
+        }
+      })
+      .catch(error => {
+        console.error("Erro ao excluir resultados:", error);
+        showMessage("Erro ao excluir resultados.", true);
+      });
+  }
+}
+
+    // Função para exibir mensagens
+    function showMessage(text, isError = false) {
+      // Criar elemento de mensagem se não existir
+      let messageElement = document.getElementById('flashMessage');
+      
+      if (!messageElement) {
+        messageElement = document.createElement('div');
+        messageElement.id = 'flashMessage';
+        messageElement.className = 'flash-message';
+        document.body.appendChild(messageElement);
+      }
+      
+      messageElement.textContent = text;
+      messageElement.className = 'flash-message';
+      
+      if (isError) {
+        messageElement.classList.add('bg-red-500', 'text-white');
+      } else {
+        messageElement.classList.add('bg-green-500', 'text-white');
+      }
+      
+      // Mostrar a mensagem
+      messageElement.style.display = 'block';
+      
+      setTimeout(() => {
+        messageElement.style.display = 'none';
+      }, 5000);
+    }
+
+    // Voltar para a página anterior
+    function goBack() {
+      isRedirecting = true;
+      window.location.href = "index.html";
+    }
+
+    // Função de logout
+    function logout() {
+      // Parar verificação de conexão
+      if (verifyConnectionInterval) {
+        clearInterval(verifyConnectionInterval);
+        verifyConnectionInterval = null;
+      }
+      
+      // Remover listeners
+      if (deviceRef) deviceRef.off();
+      if (userDeviceRef) userDeviceRef.off();
+      if (measurementListener) measurementRef.off('value', measurementListener);
+      if (resultsListener) resultsRef.off('value', resultsListener);
+      
+      // Liberar dispositivo
+      if (deviceCode && user) {
+        // Verificar se ainda somos os proprietários antes de liberar
+        deviceRef.once('value').then(snapshot => {
+          const deviceData = snapshot.val();
+          if (deviceData && deviceData.usuario === user.uid) {
+            deviceRef.update({
+              estado: "disponivel",
+              usuario: null
+            });
+          }
+          
+          // Remover usuário da lista de conexões
+          database.ref("devices/" + deviceCode + "/usuarios/" + user.uid).remove();
+        }).catch(error => {
+          console.error("Erro ao liberar dispositivo:", error);
+        });
+      }
+      
+      // Fazer logout
+      firebase.auth().signOut()
+        .then(() => {
+          isRedirecting = true;
+          window.location.href = "login.html";
+        })
+        .catch(error => {
+          console.error("Erro no logout:", error);
+        });
+    }
+
+    // Liberar recursos quando a página for fechada/recarregada
+    window.addEventListener('beforeunload', () => {
+      if (!isRedirecting && deviceCode && user) {
+        // Verificar se ainda somos os proprietários antes de liberar
+        deviceRef.once('value').then(snapshot => {
+          const deviceData = snapshot.val();
+          if (deviceData && deviceData.usuario === user.uid) {
+            deviceRef.update({
+              estado: "disponivel",
+              usuario: null
+            });
+          }
+          
+          // Remover usuário da lista de conexões
+          database.ref("devices/" + deviceCode + "/usuarios/" + user.uid).remove();
+        }).catch(error => {
+          console.error("Erro ao liberar dispositivo:", error);
+        });
+      }
+    });
+
+    // Verificar se o Firebase foi carregado corretamente
+    if (typeof firebase === 'undefined') {
+      showMessage('Erro: Firebase não carregado. Recarregue a página.', true);
+      console.error('Firebase não carregado!');
+    } else {
+      console.log('Firebase carregado com sucesso');
+    }
+  </script>
+</body>
+</html>

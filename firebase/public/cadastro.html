@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastro - BoxeIoT</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 0;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    .btn-loading {
+      position: relative;
+      color: transparent;
+    }
+    .btn-loading::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 20px;
+      height: 20px;
+      margin: -10px 0 0 -10px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .device-badge {
+      background-color: #3B82F6;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+  </style>
+  <!-- Scripts do Firebase na ordem correta -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body>
+  <div class="card p-8 rounded-lg shadow-lg w-full max-w-md">
+    <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">Cadastro - BoxeIoT</h2>
+    
+    <!-- Badge do dispositivo se estiver na URL -->
+    <div id="deviceBadge" class="device-badge hidden">
+      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+      </svg>
+      Dispositivo detectado
+    </div>
+    
+    <!-- Div para exibir mensagens de sucesso ou erro -->
+    <div id="message" class="hidden mb-4 p-3 rounded-lg text-center font-medium transition-all duration-300"></div>
+
+    <div class="space-y-4">
+      <input type="text" id="name" placeholder="Nome completo" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <input type="email" id="email" placeholder="E-mail" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <input type="password" id="password" placeholder="Senha" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <input type="password" id="confirmPassword" placeholder="Confirmar senha" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+
+    <button onclick="register(
+      document.getElementById('name').value,
+      document.getElementById('email').value,
+      document.getElementById('password').value,
+      document.getElementById('confirmPassword').value
+    )" class="w-full bg-blue-600 text-white font-semibold py-3 mt-6 rounded-lg hover:bg-blue-700 transition duration-300">
+      Criar Conta
+    </button>
+
+    <div class="flex items-center my-6">
+      <hr class="flex-grow border-gray-300">
+      <span class="px-3 text-gray-500 text-sm">Ou cadastre-se com</span>
+      <hr class="flex-grow border-gray-300">
+    </div>
+
+    <button onclick="registerWithGoogle()" class="w-full flex items-center justify-center bg-red-600 text-white font-semibold py-3 rounded-lg hover:bg-red-700 transition duration-300">
+      <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12.0001 4.75C14.7351 4.75 16.9691 5.92515 18.1991 7.29415L20.2441 5.25015C18.1751 3.09015 15.3401 1.75015 12.0001 1.75015C7.99009 1.75015 4.54509 4.13515 2.87309 7.79415L5.47409 9.85515C6.27509 6.84815 8.92209 4.75015 12.0001 4.75015Z"/>
+        <path d="M22.0001 11.25H21.4901C21.6661 12.181 21.7501 13.116 21.7501 14.048C21.7501 15.013 21.6561 15.986 21.4691 16.953C21.2821 17.92 21.0001 18.887 20.6181 19.854C20.2361 20.821 19.7541 21.788 19.1721 22.755L16.5711 20.694C17.0691 20.088 17.5671 19.482 17.9571 18.876C18.3471 18.27 18.6381 17.664 18.8291 17.058C19.0201 16.452 19.1101 15.846 19.1101 15.24C19.1101 14.634 19.0201 14.028 18.8291 13.422C18.6381 12.816 18.3471 12.21 17.9571 11.604L19.1721 11.25H22.0001Z" fill="#34A853"/>
+        <path d="M12.0001 22.25C9.26509 22.25 7.03109 21.0748 5.80109 19.7058L3.75609 21.7498C5.82509 23.9098 8.66009 25.2498 12.0001 25.2498C16.0101 25.2498 19.4551 22.8648 21.1271 19.2058L18.5261 17.1448C17.7251 20.1518 15.0781 22.2508 12.0001 22.2508Z" fill="#FBBC04"/>
+        <path d="M12.0001 1.75015C15.3401 1.75015 18.1751 3.09015 20.2441 5.25015L18.1991 7.29415C16.9691 5.92515 14.7351 4.75015 12.0001 4.75015C8.92209 4.75015 6.27509 6.84815 5.47409 9.85515L2.87309 7.79415C4.54509 4.13515 7.99009 1.75015 12.0001 1.75015Z" fill="#EA4335"/>
+      </svg>
+      Continuar com Google
+    </button>
+
+    <p class="text-center text-gray-500 mt-6 text-sm">
+      Já tem uma conta? <a href="login.html${window.location.search}" class="text-blue-600 hover:underline">Faça login</a>
+    </p>
+  </div>
+
+  <script>
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBLsU5CMvKQOm9Qs9mu6X1K27fVI8WuBQg",
+      authDomain: "boxeiot.firebaseapp.com",
+      databaseURL: "https://boxeiot-default-rtdb.firebaseio.com",
+      projectId: "boxeiot",
+      storageBucket: "boxeiot.firebasestorage.app",
+      messagingSenderId: "510231005229",
+      appId: "1:510231005229:web:13e764df17a953ff9d50a4",
+      measurementId: "G-0LP6HCJKGR"
+    };
+
+    // Inicializa o Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const database = firebase.database();
+
+    // Variável para armazenar o código do dispositivo da URL
+    let deviceCodeFromURL = null;
+
+    // Verificar parâmetros da URL ao carregar a página
+    document.addEventListener('DOMContentLoaded', function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      deviceCodeFromURL = urlParams.get('device');
+      
+      if (deviceCodeFromURL) {
+        // Mostrar badge do dispositivo
+        const deviceBadge = document.getElementById('deviceBadge');
+        deviceBadge.classList.remove('hidden');
+        
+        // Mostrar mensagem informativa
+        showMessage('Dispositivo detectado! Após o cadastro, ele será registrado automaticamente.', false);
+        
+        // Armazenar no sessionStorage para uso posterior
+        sessionStorage.setItem('deviceCodeFromURL', deviceCodeFromURL);
+      }
+    });
+
+    // Verificar se o usuário já está logado
+    firebase.auth().onAuthStateChanged((user) => {
+      if (user) {
+        // Se já está logado e tem dispositivo na URL, cadastrar e redirecionar
+        if (deviceCodeFromURL) {
+          checkDeviceAndRedirect(deviceCodeFromURL, user.uid);
+        } else {
+          // Se já está logado sem dispositivo, redirecionar normalmente
+          window.location.href = "dispositivos.html";
+        }
+      }
+    });
+
+    // Função para exibir mensagens
+    function showMessage(text, isError = false) {
+      const messageElement = document.getElementById('message');
+      messageElement.textContent = text;
+      messageElement.classList.remove('hidden', 'bg-red-200', 'text-red-800', 'bg-green-200', 'text-green-800');
+      
+      if (isError) {
+        messageElement.classList.add('bg-red-200', 'text-red-800');
+      } else {
+        messageElement.classList.add('bg-green-200', 'text-green-800');
+      }
+      
+      setTimeout(() => {
+        messageElement.classList.add('hidden');
+      }, 5000);
+    }
+
+    // Função para verificar e redirecionar
+    function checkDeviceAndRedirect(deviceCode, userId) {
+      // Verificar se dispositivo já existe para o usuário
+      firebase.database().ref('users/' + userId + '/dispositivos/' + deviceCode).once('value')
+        .then(snapshot => {
+          if (snapshot.exists()) {
+            // Já existe - redirecionar para index
+            showMessage("Cadastro realizado! Redirecionando...", false);
+            setTimeout(() => {
+              window.location.href = `index.html?device=${deviceCode}`;
+            }, 1500);
+          } else {
+            // Não existe - adicionar dispositivo
+            addDeviceToUser(deviceCode, userId);
+          }
+        })
+        .catch(error => {
+          console.error("Erro ao verificar dispositivo:", error);
+          // Em caso de erro, redirecionar normalmente
+          showMessage("Cadastro realizado! Redirecionando...", false);
+          setTimeout(() => {
+            window.location.href = "dispositivos.html";
+          }, 1500);
+        });
+    }
+
+    // Função para adicionar dispositivo ao usuário
+    function addDeviceToUser(deviceCode, userId, deviceName = null) {
+      const deviceData = {
+        apelido: deviceName || `Dispositivo ${deviceCode}`,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      };
+      
+      // Cadastrar dispositivo para o usuário
+      firebase.database().ref('users/' + userId + '/dispositivos/' + deviceCode).set(deviceData)
+        .then(() => {
+          // Verificar se o dispositivo já existe na estrutura global
+          return firebase.database().ref('devices/' + deviceCode).once('value');
+        })
+        .then(snapshot => {
+          if (!snapshot.exists()) {
+            // Criar dispositivo com a estrutura padrão se não existir
+            const newDeviceData = {
+              estado: "disponivel",
+              timestamp: firebase.database.ServerValue.TIMESTAMP
+            };
+            return firebase.database().ref('devices/' + deviceCode).set(newDeviceData);
+          }
+        })
+        .then(() => {
+          showMessage("Dispositivo cadastrado com sucesso! Redirecionando...", false);
+          // Limpar o código do sessionStorage
+          sessionStorage.removeItem('deviceCodeFromURL');
+          // Redirecionar para a página principal com o dispositivo selecionado
+          setTimeout(() => {
+            window.location.href = `index.html?device=${deviceCode}`;
+          }, 1500);
+        })
+        .catch(error => {
+          console.error("Erro ao cadastrar dispositivo:", error);
+          showMessage("Cadastro realizado, mas erro ao cadastrar dispositivo. Redirecionando...", true);
+          // Redirecionar normalmente mesmo com erro
+          setTimeout(() => {
+            window.location.href = "dispositivos.html";
+          }, 2000);
+        });
+    }
+
+    // Função de cadastro com email e senha
+    function register(name, email, password, confirmPassword) {
+      // Validação dos campos
+      if (!name || !email || !password || !confirmPassword) {
+        showMessage('Por favor, preencha todos os campos.', true);
+        return;
+      }
+      
+      if (password !== confirmPassword) {
+        showMessage('As senhas não coincidem.', true);
+        return;
+      }
+      
+      if (password.length < 6) {
+        showMessage('A senha deve ter pelo menos 6 caracteres.', true);
+        return;
+      }
+      
+      console.log("Tentando cadastrar:", email);
+      
+      firebase.auth().createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+          console.log("Cadastro bem-sucedido:", userCredential.user.uid);
+          
+          // Adicionar nome do usuário ao perfil
+          userCredential.user.updateProfile({
+            displayName: name
+          }).then(() => {
+            // Salvar dados adicionais do usuário no Realtime Database
+            const userData = {
+              nome: name,
+              email: email,
+              createdAt: firebase.database.ServerValue.TIMESTAMP,
+              dispositivos: {}
+            };
+            
+            return firebase.database().ref('users/' + userCredential.user.uid).set(userData);
+          }).then(() => {
+            if (deviceCodeFromURL) {
+              // Se tem dispositivo na URL, cadastrar e redirecionar
+              showMessage("Cadastro realizado! Cadastrando dispositivo...", false);
+              checkDeviceAndRedirect(deviceCodeFromURL, userCredential.user.uid);
+            } else {
+              // Comportamento normal - redirecionar para dispositivos
+              showMessage("Cadastro realizado com sucesso! Redirecionando...", false);
+              setTimeout(() => {
+                window.location.href = "dispositivos.html";
+              }, 1500);
+            }
+          });
+        })
+        .catch(error => {
+          console.error("Erro completo no cadastro:", error);
+          showMessage("Cadastro falhou: " + error.message, true);
+        });
+    }
+
+    // Função de cadastro com Google
+    function registerWithGoogle() {
+      console.log("Iniciando cadastro com Google");
+      
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      firebase.auth().signInWithPopup(provider)
+        .then((result) => {
+          console.log("Cadastro com Google bem-sucedido", result.user);
+          
+          // Verificar se é um novo usuário
+          if (result.additionalUserInfo.isNewUser) {
+            const user = result.user;
+            const userData = {
+              nome: user.displayName,
+              email: user.email,
+              createdAt: firebase.database.ServerValue.TIMESTAMP,
+              dispositivos: {}
+            };
+            
+            firebase.database().ref('users/' + user.uid).set(userData)
+              .then(() => {
+                if (deviceCodeFromURL) {
+                  // Se tem dispositivo na URL, cadastrar e redirecionar
+                  showMessage("Cadastro realizado! Cadastrando dispositivo...", false);
+                  checkDeviceAndRedirect(deviceCodeFromURL, user.uid);
+                } else {
+                  // Comportamento normal
+                  showMessage("Cadastro realizado! Redirecionando...", false);
+                  setTimeout(() => {
+                    window.location.href = "dispositivos.html";
+                  }, 1500);
+                }
+              });
+          } else if (deviceCodeFromURL) {
+            // Usuário existente com dispositivo na URL
+            showMessage("Login realizado! Cadastrando dispositivo...", false);
+            checkDeviceAndRedirect(deviceCodeFromURL, result.user.uid);
+          } else {
+            // Usuário existente sem dispositivo - redirecionar normalmente
+            showMessage("Login realizado! Redirecionando...", false);
+            setTimeout(() => {
+              window.location.href = "dispositivos.html";
+            }, 1500);
+          }
+        })
+        .catch(error => {
+          console.error("Erro completo no cadastro com Google:", error);
+          showMessage("Erro no cadastro com Google: " + error.message, true);
+        });
+    }
+
+    // Verificar se o Firebase foi carregado corretamente
+    if (typeof firebase === 'undefined') {
+      showMessage('Erro: Firebase não carregado. Recarregue a página.', true);
+      console.error('Firebase não carregado!');
+    } else {
+      console.log('Firebase carregado com sucesso');
+    }
+  </script>
+</body>
+</html>

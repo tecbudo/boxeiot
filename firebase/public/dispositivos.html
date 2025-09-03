@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meus Dispositivos - BoxeIoT</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    .device-card {
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .device-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+    }
+    .status-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .status-disponivel { background-color: #10B981; }
+    .status-ocupado { background-color: #3B82F6; }
+    .status-manutencao { background-color: #F59E0B; }
+    .status-desconhecido { background-color: #9CA3AF; }
+    /* Modal styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 50;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background-color: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 400px;
+    }
+  </style>
+  <!-- Scripts do Firebase na ordem correta -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body class="flex flex-col min-h-screen">
+  <div class="container mx-auto flex-grow">
+    <div class="card p-6 mt-8">
+      <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-800">Meus Dispositivos</h1>
+        <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300">
+          Sair
+        </button>
+      </div>
+      
+      <div class="mb-6">
+        <a href="cadastro-dispositivo.html" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg inline-flex items-center">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+          </svg>
+          Adicionar Dispositivo
+        </a>
+      </div>
+      
+      <div id="devicesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="text-center py-8">Carregando dispositivos...</div>
+      </div>
+
+      <div id="noDevicesMessage" class="hidden text-center py-8">
+        <p class="text-gray-500 mb-4 text-lg">Você ainda não possui dispositivos cadastrados.</p>
+        <a href="cadastro-dispositivo.html" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg inline-block">
+          Adicionar primeiro dispositivo
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para adicionar dispositivo da URL -->
+  <div id="addDeviceModal" class="modal">
+    <div class="modal-content">
+      <h3 class="text-xl font-semibold text-gray-800 mb-4">Adicionar Dispositivo</h3>
+      <p class="text-gray-600 mb-4">Foi detectado um dispositivo para adicionar. Dê um nome para ele:</p>
+      
+      <input type="text" id="deviceNickname" placeholder="Nome do dispositivo" class="w-full p-3 border border-gray-300 rounded-lg mb-4" value="Dispositivo ">
+      
+      <div class="flex justify-between">
+        <button onclick="cancelAddDevice()" class="bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg">
+          Cancelar
+        </button>
+        <button onclick="confirmAddDevice()" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg">
+          Adicionar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para renomear dispositivo -->
+  <div id="renameModal" class="modal">
+    <div class="modal-content">
+      <h3 class="text-xl font-semibold text-gray-800 mb-4">Renomear Dispositivo</h3>
+      
+      <input type="text" id="renameInput" placeholder="Novo nome" class="w-full p-3 border border-gray-300 rounded-lg mb-4">
+      <input type="hidden" id="renameDeviceId">
+      
+      <div class="flex justify-between">
+        <button onclick="closeRenameModal()" class="bg-gray-500 text-white font-semibold py-2 px-4 rounded-lg">
+          Cancelar
+        </button>
+        <button onclick="saveRename()" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg">
+          Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="text-center text-white py-4 mt-8">
+    <p>BoxeIoT &copy; 2023 - Sistema de Monitoramento de Sensores</p>
+  </footer>
+
+  <script>
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBLsU5CMvKQOm9Qs9mu6X1K27fVI8WuBQg",
+      authDomain: "boxeiot.firebaseapp.com",
+      databaseURL: "https://boxeiot-default-rtdb.firebaseio.com",
+      projectId: "boxeiot",
+      storageBucket: "boxeiot.firebasestorage.app",
+      messagingSenderId: "510231005229",
+      appId: "1:510231005229:web:13e764df17a953ff9d50a4",
+      measurementId: "G-0LP6HCJKGR"
+    };
+
+    // Inicializa o Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const database = firebase.database();
+
+    // Variáveis globais
+    let deviceCodeFromURL = null;
+    let userDevices = {};
+
+    // Verificar autenticação e parâmetros da URL
+    firebase.auth().onAuthStateChanged((user) => {
+      if (!user) {
+        window.location.href = "login.html";
+      } else {
+        // Verificar se há dispositivo na URL
+        const urlParams = new URLSearchParams(window.location.search);
+        deviceCodeFromURL = urlParams.get('device');
+        
+        if (deviceCodeFromURL) {
+          // Verificar se dispositivo já existe antes de mostrar modal
+          checkIfDeviceExists(deviceCodeFromURL, user.uid);
+        } else {
+          loadUserDevices(user.uid);
+        }
+      }
+    });
+
+    // Verificar se dispositivo já existe
+    function checkIfDeviceExists(deviceCode, userId) {
+      firebase.database().ref('users/' + userId + '/dispositivos/' + deviceCode).once('value')
+        .then(snapshot => {
+          if (snapshot.exists()) {
+            // Dispositivo já existe - não mostrar modal
+            showMessage('Este dispositivo já está em sua lista.', false);
+            // Limpar parâmetro da URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            loadUserDevices(userId);
+          } else {
+            // Dispositivo não existe - mostrar modal para adicionar
+            showAddDeviceModal(deviceCode);
+          }
+        });
+    }
+
+    // Mostrar modal para adicionar dispositivo
+    function showAddDeviceModal(deviceCode) {
+      const modal = document.getElementById('addDeviceModal');
+      const input = document.getElementById('deviceNickname');
+      
+      input.value = `Dispositivo ${deviceCode}`;
+      modal.style.display = 'flex';
+    }
+
+    // Confirmar adição do dispositivo
+    function confirmAddDevice() {
+      const nickname = document.getElementById('deviceNickname').value.trim();
+      const user = firebase.auth().currentUser;
+      
+      if (!nickname) {
+        showMessage('Por favor, digite um nome para o dispositivo.', true);
+        return;
+      }
+      
+      const deviceData = {
+        apelido: nickname,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      };
+      
+      firebase.database().ref('users/' + user.uid + '/dispositivos/' + deviceCodeFromURL).set(deviceData)
+        .then(() => {
+          // Verificar se precisa criar na estrutura global
+          return firebase.database().ref('devices/' + deviceCodeFromURL).once('value');
+        })
+        .then(snapshot => {
+          if (!snapshot.exists()) {
+            const newDeviceData = {
+              estado: "disponivel",
+              timestamp: firebase.database.ServerValue.TIMESTAMP
+            };
+            return firebase.database().ref('devices/' + deviceCodeFromURL).set(newDeviceData);
+          }
+        })
+        .then(() => {
+          closeAddDeviceModal();
+          showMessage('Dispositivo adicionado com sucesso!', false);
+          // Recarregar lista de dispositivos
+          loadUserDevices(user.uid);
+          // Limpar parâmetro da URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        })
+        .catch(error => {
+          console.error("Erro ao adicionar dispositivo:", error);
+          showMessage("Erro ao adicionar dispositivo: " + error.message, true);
+        });
+    }
+
+    // Cancelar adição do dispositivo
+    function cancelAddDevice() {
+      closeAddDeviceModal();
+      // Limpar parâmetro da URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Recarregar a página sem o parâmetro
+      window.location.reload();
+    }
+
+    function closeAddDeviceModal() {
+      document.getElementById('addDeviceModal').style.display = 'none';
+    }
+
+    // Função para carregar dispositivos do usuário
+    function loadUserDevices(userId) {
+      firebase.database().ref('users/' + userId + '/dispositivos').on('value', (snapshot) => {
+        const devices = snapshot.val() || {};
+        userDevices = devices;
+        const devicesList = document.getElementById('devicesList');
+        const noDevicesMessage = document.getElementById('noDevicesMessage');
+        
+        if (Object.keys(devices).length === 0) {
+          devicesList.classList.add('hidden');
+          noDevicesMessage.classList.remove('hidden');
+          return;
+        }
+        
+        devicesList.classList.remove('hidden');
+        noDevicesMessage.classList.add('hidden');
+        devicesList.innerHTML = '';
+        
+        Object.keys(devices).forEach(deviceCode => {
+          const deviceData = devices[deviceCode];
+          const apelido = deviceData.apelido || deviceCode;
+          
+          // Buscar status do dispositivo
+          firebase.database().ref('devices/' + deviceCode).once('value')
+            .then(deviceSnapshot => {
+              const deviceStatus = deviceSnapshot.val() ? (deviceSnapshot.val().estado || "desconhecido") : "desconhecido";
+              let statusClass = "status-desconhecido";
+              let statusText = "Desconhecido";
+              
+              switch(deviceStatus) {
+                case "disponivel":
+                  statusClass = "status-disponivel";
+                  statusText = "Disponível";
+                  break;
+                case "ocupado":
+                  statusClass = "status-ocupado";
+                  statusText = "Ocupado";
+                  break;
+                case "manutencao":
+                  statusClass = "status-manutencao";
+                  statusText = "Manutenção";
+                  break;
+              }
+              
+              const deviceCard = document.createElement('div');
+              deviceCard.className = 'device-card bg-white rounded-lg shadow-lg p-6';
+              deviceCard.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                  <h3 class="text-xl font-semibold text-gray-800">${apelido}</h3>
+                  <div class="flex space-x-2">
+                    <button onclick="openRenameModal('${deviceCode}', '${apelido.replace(/'/g, "\\'")}')" class="text-blue-600 hover:text-blue-800" title="Renomear">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                      </svg>
+                    </button>
+                    <button onclick="removeDevice('${deviceCode}')" class="text-red-600 hover:text-red-800" title="Remover">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <p class="text-gray-600 mb-2">Código: ${deviceCode}</p>
+                <div class="flex items-center mb-4">
+                  <span class="${statusClass}"></span>
+                  <span class="text-sm">Status: ${statusText}</span>
+                </div>
+                <a href="index.html?device=${deviceCode}" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg block text-center hover:bg-blue-700 transition duration-300">
+                  Acessar
+                </a>
+              `;
+              
+              devicesList.appendChild(deviceCard);
+            })
+            .catch(error => {
+              console.error("Erro ao carregar informações do dispositivo:", error);
+            });
+        });
+      });
+    }
+
+    // Função para abrir modal de renomear
+    function openRenameModal(deviceCode, currentName) {
+      document.getElementById('renameInput').value = currentName;
+      document.getElementById('renameDeviceId').value = deviceCode;
+      document.getElementById('renameModal').style.display = 'flex';
+    }
+
+    function closeRenameModal() {
+      document.getElementById('renameModal').style.display = 'none';
+    }
+
+    // Função para salvar renomeação
+    function saveRename() {
+      const newName = document.getElementById('renameInput').value.trim();
+      const deviceCode = document.getElementById('renameDeviceId').value;
+      const user = firebase.auth().currentUser;
+      
+      if (!newName) {
+        showMessage('Por favor, digite um nome para o dispositivo.', true);
+        return;
+      }
+      
+      firebase.database().ref('users/' + user.uid + '/dispositivos/' + deviceCode + '/apelido').set(newName)
+        .then(() => {
+          closeRenameModal();
+          showMessage('Dispositivo renomeado com sucesso!', false);
+          // Recarregar a lista para atualizar o nome
+          loadUserDevices(user.uid);
+        })
+        .catch(error => {
+          console.error("Erro ao renomear dispositivo:", error);
+          showMessage("Erro ao renomear dispositivo: " + error.message, true);
+        });
+    }
+
+    // Função para remover dispositivo
+    function removeDevice(deviceCode) {
+      if (!confirm('Tem certeza que deseja remover este dispositivo?')) {
+        return;
+      }
+      
+      const user = firebase.auth().currentUser;
+      
+      firebase.database().ref('users/' + user.uid + '/dispositivos/' + deviceCode).remove()
+        .then(() => {
+          showMessage('Dispositivo removido com sucesso!', false);
+          // Recarregar a lista
+          loadUserDevices(user.uid);
+        })
+        .catch(error => {
+          console.error("Erro ao remover dispositivo:", error);
+          showMessage("Erro ao remover dispositivo: " + error.message, true);
+        });
+    }
+
+    // Função para exibir mensagens
+    function showMessage(text, isError = false) {
+      // Implementação simples de mensagem - pode ser melhorada
+      alert(text);
+    }
+
+    // Função de logout
+    function logout() {
+      firebase.auth().signOut()
+        .then(() => {
+          window.location.href = "login.html";
+        })
+        .catch(error => {
+          console.error("Erro no logout:", error);
+          alert("Erro ao fazer logout: " + error.message);
+        });
+    }
+  </script>
+</body>
+</html>

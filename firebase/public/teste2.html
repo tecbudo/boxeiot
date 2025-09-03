@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de Dispositivo - BoxeIoT</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #1a2a6c, #2d3748, #4a5568);
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    .status-indicator {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 10px;
+    }
+    .status-connected {
+      background-color: #10B981;
+    }
+    .status-disconnected {
+      background-color: #EF4444;
+    }
+    .status-waiting {
+      background-color: #F59E0B;
+    }
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+  </style>
+  <!-- Scripts do Firebase na ordem correta -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body class="flex flex-col min-h-screen">
+  <div class="container mx-auto flex-grow">
+    <!-- Cabeçalho -->
+    <div class="card p-6 mt-8 mb-8">
+      <h1 class="text-3xl font-bold text-gray-800 mb-4">Simulador de Dispositivo BoxeIoT</h1>
+      
+      <div class="flex items-center mb-4">
+        <span id="statusIndicator" class="status-indicator status-disconnected"></span>
+        <span id="statusText" class="font-medium">Desconectado</span>
+      </div>
+      
+      <!-- Configuração do dispositivo -->
+      <div class="mb-6">
+        <label class="block text-gray-700 mb-2 font-medium">Código do Dispositivo:</label>
+        <input type="text" id="deviceCode" placeholder="Digite o código do dispositivo" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button onclick="connectToDevice()" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300">
+          Conectar
+        </button>
+      </div>
+      
+      <!-- Informações do dispositivo -->
+      <div id="deviceInfo" class="hidden">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Informações do Dispositivo</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p class="text-gray-600">Estado atual:</p>
+            <p id="currentState" class="font-semibold">-</p>
+          </div>
+          <div>
+            <p class="text-gray-600">Usuário conectado:</p>
+            <p id="currentUser" class="font-semibold">-</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log de atividades -->
+    <div class="card p-6 mb-8">
+      <h2 class="text-2xl font-semibold text-gray-800 mb-4">Log de Atividades</h2>
+      <div id="activityLog" class="bg-gray-100 p-4 rounded-lg h-64 overflow-y-auto">
+        <p class="text-gray-500">Nenhuma atividade registrada ainda.</p>
+      </div>
+    </div>
+
+    <!-- Controles de simulação -->
+    <div class="card p-6 mb-8">
+      <h2 class="text-2xl font-semibold text-gray-800 mb-4">Controles de Simulação</h2>
+      
+      <div class="mb-4">
+        <label class="block text-gray-700 mb-2 font-medium">Tempo de resposta mínimo (ms):</label>
+        <input type="number" id="minTime" value="100" min="50" max="1000" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      
+      <div class="mb-6">
+        <label class="block text-gray-700 mb-2 font-medium">Tempo de resposta máximo (ms):</label>
+        <input type="number" id="maxTime" value="500" min="100" max="2000" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      
+      <div class="flex gap-4">
+        <button onclick="startSimulation()" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300">
+          Iniciar Simulação
+        </button>
+        <button onclick="stopSimulation()" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300">
+          Parar Simulação
+        </button>
+        <button onclick="simulateHit()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300">
+          Simular Golpe Único
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="text-center text-white py-4 mt-8">
+    <p>BoxeIoT &copy; 2023 - Simulador de Dispositivo</p>
+  </footer>
+
+  <script>
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBLsU5CMvKQOm9Qs9mu6X1K27fVI8WuBQg",
+      authDomain: "boxeiot.firebaseapp.com",
+      databaseURL: "https://boxeiot-default-rtdb.firebaseio.com",
+      projectId: "boxeiot",
+      storageBucket: "boxeiot.firebasestorage.app",
+      messagingSenderId: "510231005229",
+      appId: "1:510231005229:web:13e764df17a953ff9d50a4",
+      measurementId: "G-0LP6HCJKGR"
+    };
+
+    // Inicializa o Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // Variáveis globais
+    let deviceCode = null;
+    let deviceRef = null;
+    let measurementRef = null;
+    let stateListener = null;
+    let isSimulating = false;
+    let currentMeasurementId = null;
+
+    // Conectar ao dispositivo
+    function connectToDevice() {
+      const code = document.getElementById('deviceCode').value.trim();
+      
+      if (!code) {
+        addToLog('Erro: Código do dispositivo não informado.', 'error');
+        return;
+      }
+      
+      deviceCode = code;
+      deviceRef = database.ref("devices/" + deviceCode);
+      measurementRef = database.ref("devices/" + deviceCode + "/medicoes/tempo_reacao");
+      
+      // Verificar se o dispositivo existe
+      deviceRef.once('value')
+        .then(snapshot => {
+          if (snapshot.exists()) {
+            updateStatus('Conectado', 'connected');
+            document.getElementById('deviceInfo').classList.remove('hidden');
+            addToLog('Conectado ao dispositivo: ' + deviceCode, 'success');
+            
+            // Monitorar estado do dispositivo
+            monitorDeviceState();
+            
+            // Carregar informações iniciais
+            updateDeviceInfo(snapshot.val());
+          } else {
+            addToLog('Dispositivo não encontrado: ' + deviceCode, 'error');
+            updateStatus('Dispositivo não encontrado', 'disconnected');
+          }
+        })
+        .catch(error => {
+          addToLog('Erro ao conectar: ' + error.message, 'error');
+          updateStatus('Erro de conexão', 'disconnected');
+        });
+    }
+
+    // Monitorar estado do dispositivo
+    function monitorDeviceState() {
+      if (stateListener) {
+        deviceRef.off('value', stateListener);
+      }
+      
+      stateListener = deviceRef.on('value', snapshot => {
+        const data = snapshot.val();
+        updateDeviceInfo(data);
+        
+        // Verificar se há uma medição em andamento
+        if (data && data.estado === "iniciado" && isSimulating) {
+          handleMeasurementStart();
+        }
+      });
+    }
+
+    // Atualizar informações do dispositivo na UI
+    function updateDeviceInfo(data) {
+      if (data) {
+        document.getElementById('currentState').textContent = data.estado || 'Nenhum';
+        document.getElementById('currentUser').textContent = data.usuario || 'Nenhum';
+      }
+    }
+
+    // Atualizar status de conexão
+    function updateStatus(status, type) {
+      const indicator = document.getElementById('statusIndicator');
+      const statusText = document.getElementById('statusText');
+      
+      statusText.textContent = status;
+      indicator.className = 'status-indicator';
+      
+      if (type === 'connected') {
+        indicator.classList.add('status-connected');
+      } else if (type === 'disconnected') {
+        indicator.classList.add('status-disconnected');
+      } else if (type === 'waiting') {
+        indicator.classList.add('status-waiting');
+      }
+    }
+
+    // Iniciar simulação
+    function startSimulation() {
+      if (!deviceRef) {
+        addToLog('Erro: Conecte-se a um dispositivo primeiro.', 'error');
+        return;
+      }
+      
+      isSimulating = true;
+      addToLog('Simulação iniciada. Aguardando medições...', 'success');
+    }
+
+    // Parar simulação
+    function stopSimulation() {
+      isSimulating = false;
+      addToLog('Simulação parada.', 'info');
+    }
+
+    // Simular um golpe único
+    function simulateHit() {
+      if (!deviceRef) {
+        addToLog('Erro: Conecte-se a um dispositivo primeiro.', 'error');
+        return;
+      }
+      
+      handleMeasurementStart();
+    }
+
+    // Manipular início de medição
+    function handleMeasurementStart() {
+      if (currentMeasurementId) {
+        addToLog('Já existe uma medição em andamento. Ignorando.', 'info');
+        return;
+      }
+      
+      // Gerar ID único para esta medição
+      currentMeasurementId = new Date().getTime().toString();
+      
+      addToLog('Medição detectada. Aguardando tempo aleatório...', 'info');
+      
+      // Obter tempos mínimo e máximo
+      const minTime = parseInt(document.getElementById('minTime').value) || 100;
+      const maxTime = parseInt(document.getElementById('maxTime').value) || 500;
+      
+      // Gerar tempo aleatório entre minTime e maxTime (em ms)
+      const randomTime = Math.floor(Math.random() * (maxTime - minTime + 1)) + minTime;
+      
+      addToLog(`Tempo de resposta simulado: ${randomTime}ms`, 'info');
+      
+      // Aguardar o tempo aleatório e então registrar o resultado
+      setTimeout(() => {
+        registerMeasurementResult(randomTime);
+      }, randomTime);
+    }
+
+    // Registrar resultado da medição
+    function registerMeasurementResult(responseTime) {
+      if (!deviceRef || !currentMeasurementId) return;
+      
+      // Converter para segundos com 3 casas decimais
+      const timeInSeconds = (responseTime / 1000).toFixed(3);
+      
+      const resultData = {
+        estado: "concluido",
+        tempoReacao: parseFloat(timeInSeconds),
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      };
+      
+      measurementRef.child(currentMeasurementId).update(resultData)
+        .then(() => {
+          addToLog(`Resultado registrado: ${timeInSeconds} segundos`, 'success');
+          currentMeasurementId = null;
+        })
+        .catch(error => {
+          addToLog('Erro ao registrar resultado: ' + error.message, 'error');
+          currentMeasurementId = null;
+        });
+    }
+
+    // Adicionar entrada ao log
+    function addToLog(message, type = 'info') {
+      const logElement = document.getElementById('activityLog');
+      const entry = document.createElement('div');
+      const timestamp = new Date().toLocaleTimeString();
+      
+      entry.className = 'mb-2';
+      if (type === 'error') {
+        entry.className += ' text-red-600';
+      } else if (type === 'success') {
+        entry.className += ' text-green-600';
+      } else if (type === 'info') {
+        entry.className += ' text-blue-600';
+      }
+      
+      entry.innerHTML = `<span class="font-medium">[${timestamp}]</span> ${message}`;
+      
+      // Se não há entradas ainda, remover a mensagem padrão
+      if (logElement.querySelector('p.text-gray-500')) {
+        logElement.innerHTML = '';
+      }
+      
+      logElement.appendChild(entry);
+      logElement.scrollTop = logElement.scrollHeight;
+    }
+
+    // Verificar se o Firebase foi carregado corretamente
+    if (typeof firebase === 'undefined') {
+      addToLog('Erro: Firebase não carregado. Recarregue a página.', 'error');
+      console.error('Firebase não carregado!');
+    } else {
+      console.log('Firebase carregado com sucesso');
+      addToLog('Firebase inicializado com sucesso.', 'success');
+    }
+  </script>
+</body>
+</html>

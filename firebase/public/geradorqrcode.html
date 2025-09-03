@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Folder e Etiqueta - BoxeIoT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            min-height: 100vh;
+            padding: 20px;
+            margin: 0;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .content {
+            padding: 20px;
+        }
+        
+        .step {
+            display: flex;
+            margin-bottom: 20px;
+            align-items: flex-start;
+        }
+        
+        .step-number {
+            background: #3B82F6;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            flex-shrink: 0;
+            margin-right: 12px;
+        }
+        
+        .qr-section {
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #e5e7eb;
+            border-bottom: 1px solid #e5e7eb;
+            margin: 20px 0;
+        }
+        
+        .qr-code {
+            width: 180px;
+            height: 180px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background: white;
+        }
+        
+        .footer {
+            padding: 15px 20px;
+            text-align: center;
+            background-color: #f9fafb;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            color: #3B82F6;
+        }
+        
+        .label-card {
+            width: 300px;
+            height: 150px;
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .label-info {
+            flex: 1;
+            padding-right: 15px;
+        }
+        
+        .label-qr {
+            width: 100px;
+            height: 100px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .download-options {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+        }
+        
+        .btn-primary {
+            background: #3B82F6;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2563EB;
+        }
+        
+        .btn-success {
+            background: #10B981;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+        }
+        
+        .preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        .preview-item {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+                <h1 class="text-2xl font-bold">Gerador de Folder e Etiqueta</h1>
+                <p class="mt-2">BoxeIoT - Sistema de Treino Inteligente</p>
+            </div>
+            
+            <div class="content">
+                <div class="mb-6">
+                    <label class="block text-gray-700 mb-2 font-medium">Digite o código do dispositivo:</label>
+                    <div class="flex">
+                        <input type="text" id="deviceCode" placeholder="Código do dispositivo" class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button onclick="generateAll()" class="bg-blue-600 text-white font-semibold p-3 rounded-r-lg hover:bg-blue-700 transition duration-300 ml-2">
+                            Gerar
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="message" class="hidden mb-4 p-3 rounded-lg text-center font-medium transition-all duration-300"></div>
+                
+                <div id="previews" class="preview-container hidden">
+                    <div class="preview-item">
+                        <h3 class="font-semibold mb-3">Folder de Instruções</h3>
+                        <div id="folderPreview" class="manual-card" style="width: 300px; transform: scale(0.7); transform-origin: top center;">
+                            <div class="header">
+                                <h1 class="text-xl font-bold">Manual do Usuário</h1>
+                                <p class="text-xs mt-1">BoxeIoT - Sistema de Treino Inteligente</p>
+                            </div>
+                            
+                            <div class="content">
+                                <div class="step">
+                                    <div class="step-number">1</div>
+                                    <div>
+                                        <h3 class="font-semibold text-sm">Acesse o Sistema</h3>
+                                        <p class="text-xs text-gray-600 mt-1">Use o QR Code ao lado</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="step">
+                                    <div class="step-number">2</div>
+                                    <div>
+                                        <h3 class="font-semibold text-sm">Crie sua Conta</h3>
+                                        <p class="text-xs text-gray-600 mt-1">Faça cadastro com e-mail ou Google</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="step">
+                                    <div class="step-number">3</div>
+                                    <div>
+                                        <h3 class="font-semibold text-sm">Adicione seu Dispositivo</h3>
+                                        <p class="text-xs text-gray-600 mt-1">Use o código: <span id="previewDeviceCode"></span></p>
+                                    </div>
+                                </div>
+                                
+                                <div class="step">
+                                    <div class="step-number">4</div>
+                                    <div>
+                                        <h3 class="font-semibold text-sm">Comece a Treinar</h3>
+                                        <p class="text-xs text-gray-600 mt-1">Escolha entre Reação, Precisão ou Força</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="qr-section">
+                                    <h3 class="font-semibold mb-3 text-sm">Acesse pelo QR Code</h3>
+                                    <div id="folderQrCode" class="qr-code"></div>
+                                    <p class="text-xs text-gray-600 mt-3">Use a câmera do celular para escanear</p>
+                                </div>
+                            </div>
+                            
+                            <div class="footer">
+                                <p class="text-xs">BoxeIoT &copy; 2023</p>
+                            </div>
+                        </div>
+                        <div class="download-options">
+                            <button onclick="downloadFolder('png')" class="btn btn-primary">Download PNG</button>
+                            <button onclick="downloadFolder('jpg')" class="btn btn-success">Download JPG</button>
+                        </div>
+                    </div>
+                    
+                    <div class="preview-item">
+                        <h3 class="font-semibold mb-3">Etiqueta do Dispositivo</h3>
+                        <div id="labelPreview" class="label-card">
+                            <div class="label-info">
+                                <h4 class="font-bold text-lg">BoxeIoT</h4>
+                                <p class="text-sm mt-1">Dispositivo:</p>
+                                <p class="font-mono font-bold text-blue-600" id="labelDeviceCode"></p>
+                                <p class="text-xs mt-2">Acesse: boxeiot.web.app</p>
+                            </div>
+                            <div id="labelQrCode" class="label-qr"></div>
+                        </div>
+                        <div class="download-options">
+                            <button onclick="downloadLabel('png')" class="btn btn-primary">Download PNG</button>
+                            <button onclick="downloadLabel('jpg')" class="btn btn-success">Download JPG</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentDeviceCode = '';
+        
+        function showMessage(text, isError = false) {
+            const messageElement = document.getElementById('message');
+            messageElement.textContent = text;
+            messageElement.classList.remove('hidden', 'bg-red-200', 'text-red-800', 'bg-green-200', 'text-green-800');
+            
+            if (isError) {
+                messageElement.classList.add('bg-red-200', 'text-red-800');
+            } else {
+                messageElement.classList.add('bg-green-200', 'text-green-800');
+            }
+            
+            setTimeout(() => {
+                messageElement.classList.add('hidden');
+            }, 5000);
+        }
+        
+        function generateAll() {
+            const deviceCode = document.getElementById('deviceCode').value.trim();
+            
+            if (!deviceCode) {
+                showMessage('Por favor, insira o código do dispositivo.', true);
+                return;
+            }
+            
+            currentDeviceCode = deviceCode;
+            
+            // Gerar QR Code para o folder
+            const folderQrUrl = `https://boxeiot.web.app/login.html?device=${deviceCode}`;
+            generateQRCode('folderQrCode', folderQrUrl);
+            
+            // Gerar QR Code para a etiqueta (apenas o código)
+            generateQRCode('labelQrCode', deviceCode);
+            
+            // Atualizar o código do dispositivo nos previews
+            document.getElementById('previewDeviceCode').textContent = deviceCode;
+            document.getElementById('labelDeviceCode').textContent = deviceCode;
+            
+            // Mostrar as previsualizações
+            document.getElementById('previews').classList.remove('hidden');
+            
+            showMessage('Folder e etiqueta gerados com sucesso!', false);
+        }
+        
+        function generateQRCode(elementId, text) {
+            const qrElement = document.getElementById(elementId);
+            qrElement.innerHTML = '';
+            
+            // Gerar o QR Code
+            const qr = qrcode(0, 'M');
+            qr.addData(text);
+            qr.make();
+            
+            // Adicionar o QR Code ao DOM
+            qrElement.innerHTML = qr.createSvgTag({
+                scalable: true,
+                margin: 2,
+                color: '#2c3e50',
+                alt: 'QR Code'
+            });
+        }
+        
+        function downloadFolder(format) {
+            const folderElement = document.getElementById('folderPreview');
+            
+            html2canvas(folderElement, {
+                scale: 3, // Maior qualidade
+                backgroundColor: '#ffffff'
+            }).then(canvas => {
+                downloadCanvas(canvas, `folder-boxeiot-${currentDeviceCode}`, format);
+            });
+        }
+        
+        function downloadLabel(format) {
+            const labelElement = document.getElementById('labelPreview');
+            
+            html2canvas(labelElement, {
+                scale: 3, // Maior qualidade
+                backgroundColor: '#ffffff'
+            }).then(canvas => {
+                downloadCanvas(canvas, `etiqueta-boxeiot-${currentDeviceCode}`, format);
+            });
+        }
+        
+        function downloadCanvas(canvas, filename, format) {
+            // Criar link de download
+            const link = document.createElement('a');
+            link.download = `${filename}.${format}`;
+            
+            // Converter para o formato desejado
+            if (format === 'jpg') {
+                link.href = canvas.toDataURL('image/jpeg', 0.9);
+            } else {
+                link.href = canvas.toDataURL('image/png');
+            }
+            
+            // Disparar o download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showMessage(`Download realizado com sucesso! (${filename}.${format})`, false);
+        }
+    </script>
+</body>
+</html>

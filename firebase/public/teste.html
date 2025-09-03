@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BoxeIoT - Correção Firebase</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #1a2a6c;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+        
+        h2 {
+            color: #b21f1f;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card-title {
+            font-size: 1.5rem;
+            color: #1a2a6c;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #fdbb2d;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+            border-left: 5px solid #28a745;
+        }
+        
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border-left: 5px solid #dc3545;
+        }
+        
+        .status-waiting {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border-left: 5px solid #17a2b8;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #1a2a6c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: all 0.3s;
+            margin: 10px 5px;
+        }
+        
+        .btn:hover {
+            background: #253a8d;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-success {
+            background: #28a745;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-size: 0.9rem;
+        }
+        
+        .steps {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .steps li {
+            margin-bottom: 8px;
+        }
+        
+        .debug-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            border-left: 5px solid #6c757d;
+        }
+        
+        .debug-info h3 {
+            color: #6c757d;
+            margin-bottom: 10px;
+        }
+        
+        .test-result {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border-left: 5px solid #28a745;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 5px solid #dc3545;
+        }
+        
+        .center {
+            text-align: center;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>BoxeIoT</h1>
+            <h2>Correção do Erro "firebase.database is undefined"</h2>
+        </header>
+        
+        <div class="card">
+            <h3 class="card-title">Descrição do Problema</h3>
+            <p>O erro "firebase.database is undefined" geralmente ocorre quando:</p>
+            <ul class="steps">
+                <li>O script do Firebase Database não foi carregado corretamente</li>
+                <li>A ordem de carregamento dos scripts está incorreta</li>
+                <li>Há conflito entre versões do Firebase</li>
+                <li>O Firebase não foi inicializado antes de usar suas funções</li>
+            </ul>
+        </div>
+        
+        <div class="card">
+            <h3 class="card-title">Solução</h3>
+            <p>Para corrigir este problema, precisamos garantir que:</p>
+            <ol class="steps">
+                <li>Todos os scripts do Firebase são carregados na ordem correta</li>
+                <li>O Firebase é inicializado antes de qualquer tentativa de uso</li>
+                <li>Não há conflito de versões</li>
+            </ol>
+            
+            <div id="status" class="status status-waiting">
+                Verificando configuração do Firebase...
+            </div>
+            
+            <div class="center">
+                <button id="initFirebase" class="btn">1. Inicializar Firebase</button>
+                <button id="testFirebase" class="btn" disabled>2. Testar Conexão</button>
+                <button id="testAuth" class="btn" disabled>3. Testar Autenticação</button>
+            </div>
+            
+            <div id="testResult" class="test-result hidden"></div>
+        </div>
+        
+        <div class="card">
+            <h3 class="card-title">Configuração do Firebase</h3>
+            <pre id="configDisplay">// Configuração será exibida aqui</pre>
+        </div>
+        
+        <div class="card debug-info">
+            <h3>Informações de Debug</h3>
+            <div id="debugInfo">
+                <p>Carregando informações...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <!-- Firebase Authentication -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <!-- Firebase Database -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+    <script>
+        // Configuração do Firebase para o projeto BoxeIoT
+        const firebaseConfig = {
+            apiKey: "AIzaSyBLsU5CMvKQOm9Qs9mu6X1K27fVI8WuBQg",
+            authDomain: "boxeiot.firebaseapp.com",
+            databaseURL: "https://boxeiot-default-rtdb.firebaseio.com",
+            projectId: "boxeiot",
+            storageBucket: "boxeiot.firebasestorage.app",
+            messagingSenderId: "510231005229",
+            appId: "1:510231005229:web:13e764df17a953ff9d50a4",
+            measurementId: "G-0LP6HCJKGR"
+        };
+
+        // Exibir configuração na página
+        document.getElementById('configDisplay').textContent = JSON.stringify(firebaseConfig, null, 2);
+        
+        let app;
+        let database;
+        let auth;
+        
+        // Elementos da interface
+        const statusElement = document.getElementById('status');
+        const initButton = document.getElementById('initFirebase');
+        const testButton = document.getElementById('testFirebase');
+        const authButton = document.getElementById('testAuth');
+        const testResult = document.getElementById('testResult');
+        const debugInfo = document.getElementById('debugInfo');
+        
+        // Atualizar informações de debug
+        function updateDebugInfo() {
+            debugInfo.innerHTML = `
+                <p><strong>Firebase App:</strong> ${app ? 'Inicializado' : 'Não inicializado'}</p>
+                <p><strong>Firebase Database:</strong> ${database ? 'Disponível' : 'Indisponível'}</p>
+                <p><strong>Firebase Auth:</strong> ${auth ? 'Disponível' : 'Indisponível'}</p>
+                <p><strong>firebase.database:</strong> ${typeof firebase.database}</p>
+                <p><strong>firebase.auth:</strong> ${typeof firebase.auth}</p>
+                <p><strong>firebase.database.ServerValue:</strong> ${typeof firebase.database !== 'undefined' && typeof firebase.database.ServerValue !== 'undefined' ? 'Disponível' : 'Indisponível'}</p>
+            `;
+        }
+        
+        // Inicializar o Firebase
+        function initializeFirebase() {
+            try {
+                statusElement.textContent = 'Inicializando Firebase...';
+                statusElement.className = 'status status-waiting';
+                
+                // Verificar se o Firebase já foi carregado
+                if (typeof firebase === 'undefined') {
+                    throw new Error('Firebase não foi carregado corretamente');
+                }
+                
+                // Inicializar Firebase
+                app = firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                auth = firebase.auth();
+                
+                statusElement.textContent = 'Firebase inicializado com sucesso!';
+                statusElement.className = 'status status-success';
+                
+                // Habilitar botões de teste
+                testButton.disabled = false;
+                authButton.disabled = false;
+                
+                console.log('Firebase inicializado com sucesso:', app);
+                console.log('Database object:', database);
+                console.log('Auth object:', auth);
+                
+                updateDebugInfo();
+                
+            } catch (error) {
+                statusElement.textContent = 'Erro ao inicializar Firebase: ' + error.message;
+                statusElement.className = 'status status-error';
+                console.error('Erro ao inicializar Firebase:', error);
+                
+                updateDebugInfo();
+            }
+        }
+        
+        // Testar a conexão com o Firebase Database
+        function testFirebaseConnection() {
+            testResult.className = 'test-result';
+            testResult.innerHTML = 'Testando conexão com o Firebase Database...';
+            testResult.classList.remove('hidden');
+            
+            try {
+                if (!database) {
+                    throw new Error('Database não inicializado');
+                }
+                
+                // Tentar escrever no Firebase
+                const testRef = database.ref('testConnection');
+                const timestamp = new Date().toISOString();
+                
+                testRef.set({
+                    status: 'OK',
+                    message: 'Conexão bem-sucedida - BoxeIoT',
+                    timestamp: timestamp,
+                    serverTime: firebase.database.ServerValue.TIMESTAMP
+                })
+                .then(() => {
+                    testResult.innerHTML = `
+                        <p>✅ <strong>Sucesso!</strong> Dados escritos no Firebase.</p>
+                        <p>Valor escrito: "OK"</p>
+                        <p>Timestamp: ${timestamp}</p>
+                        <p>ServerValue.TIMESTAMP acessado com sucesso</p>
+                    `;
+                    testResult.classList.add('success');
+                    console.log('Dados escritos com sucesso no Firebase');
+                })
+                .catch((error) => {
+                    testResult.innerHTML = `
+                        <p>❌ <strong>Erro ao escrever no Firebase:</strong></p>
+                        <p>${error.message}</p>
+                    `;
+                    testResult.classList.add('error');
+                    console.error('Erro ao escrever no Firebase:', error);
+                });
+                
+            } catch (error) {
+                testResult.innerHTML = `
+                    <p>❌ <strong>Erro antes de tentar escrever:</strong></p>
+                    <p>${error.message}</p>
+                `;
+                testResult.classList.add('error');
+                console.error('Erro antes de tentar escrever:', error);
+            }
+            
+            updateDebugInfo();
+        }
+        
+        // Testar autenticação com Google
+        function testGoogleAuth() {
+            testResult.className = 'test-result';
+            testResult.innerHTML = 'Testando autenticação com Google...';
+            testResult.classList.remove('hidden');
+            
+            try {
+                if (!auth) {
+                    throw new Error('Auth não inicializado');
+                }
+                
+                const provider = new firebase.auth.GoogleAuthProvider();
+                
+                auth.signInWithPopup(provider)
+                .then((result) => {
+                    testResult.innerHTML = `
+                        <p>✅ <strong>Autenticação com Google bem-sucedida!</strong></p>
+                        <p>Usuário: ${result.user.email}</p>
+                        <p>UID: ${result.user.uid}</p>
+                    `;
+                    testResult.classList.add('success');
+                    console.log('Autenticação com Google bem-sucedida:', result.user);
+                })
+                .catch((error) => {
+                    testResult.innerHTML = `
+                        <p>❌ <strong>Erro na autenticação com Google:</strong></p>
+                        <p>${error.message}</p>
+                    `;
+                    testResult.classList.add('error');
+                    console.error('Erro na autenticação com Google:', error);
+                });
+                
+            } catch (error) {
+                testResult.innerHTML = `
+                    <p>❌ <strong>Erro ao tentar autenticar com Google:</strong></p>
+                    <p>${error.message}</p>
+                `;
+                testResult.classList.add('error');
+                console.error('Erro ao tentar autenticar com Google:', error);
+            }
+            
+            updateDebugInfo();
+        }
+        
+        // Adicionar event listeners aos botões
+        initButton.addEventListener('click', initializeFirebase);
+        testButton.addEventListener('click', testFirebaseConnection);
+        authButton.addEventListener('click', testGoogleAuth);
+        
+        // Inicializar informações de debug
+        updateDebugInfo();
+    </script>
+</body>
+</html>

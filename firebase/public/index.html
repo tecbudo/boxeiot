@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BoxeIoT - Modos de Treino</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+    }
+    .mode-btn {
+      transition: all 0.3s;
+    }
+    .mode-btn:hover {
+      transform: scale(1.05);
+    }
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    .flash-message {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      animation: slideIn 0.3s ease-out;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  </style>
+  <!-- Scripts do Firebase na ordem correta -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+</head>
+<body class="flex flex-col min-h-screen">
+  <div class="container mx-auto flex-grow">
+    <!-- Cabeçalho -->
+    <div class="card p-6 mt-8 mb-8">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center">
+          <button onclick="goBack()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 mr-4">
+            &larr; Voltar
+          </button>
+          <h1 class="text-3xl font-bold text-gray-800">BoxeIoT - Modos de Treino</h1>
+        </div>
+        <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300">
+          Sair
+        </button>
+      </div>
+      
+      <!-- Dispositivo selecionado -->
+      <div id="selectedDevice" class="mt-6 p-4 bg-blue-50 rounded-lg">
+        <h3 class="text-lg font-medium text-blue-800">Dispositivo selecionado:</h3>
+        <p id="deviceName" class="text-xl font-bold text-blue-900">Carregando...</p>
+        <button onclick="changeDevice()" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-lg transition duration-300 text-sm">
+          Alterar Dispositivo
+        </button>
+      </div>
+      
+      <!-- Status do dispositivo -->
+      <div id="deviceStatus" class="mt-4 p-4 rounded-lg bg-blue-100 text-blue-800 hidden">
+        <p class="font-medium">Status do dispositivo: <span id="statusValue">Desconectado</span></p>
+      </div>
+    </div>
+
+    <!-- Cards dos modos de treino -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <!-- Modo Tempo de Reação -->
+      <div class="card p-6 text-center">
+        <div class="bg-blue-100 p-4 rounded-full w-20 h-20 mx-auto flex items-center justify-center mb-4">
+          <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 mb-2">Tempo de Reação</h3>
+        <p class="text-gray-600 mb-4">Treine seus reflexos e velocidade de resposta.</p>
+        <button onclick="setMode('tempo_reacao')" class="mode-btn w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition duration-300">
+          Iniciar Modo
+        </button>
+      </div>
+      
+      <!-- Modo Foco -->
+      <div class="card p-6 text-center">
+        <div class="bg-green-100 p-4 rounded-full w-20 h-20 mx-auto flex items-center justify-center mb-4">
+          <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+          </svg>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 mb-2">Foco</h3>
+        <p class="text-gray-600 mb-4">Melhore sua concentração e precisão nos golpes.</p>
+        <button onclick="setMode('foco')" class="mode-btn w-full bg-green-600 text-white font-semibold py-3 rounded-lg hover:bg-green-700 transition duration-300">
+          Iniciar Modo
+        </button>
+      </div>
+      
+      <!-- Modo Força -->
+      <div class="card p-6 text-center">
+        <div class="bg-red-100 p-4 rounded-full w-20 h-20 mx-auto flex items-center justify-center mb-4">
+          <svg class="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 mb-2">Força</h3>
+        <p class="text-gray-600 mb-4">Desenvolva potência e intensidade nos seus golpes.</p>
+        <button onclick="setMode('forca')" class="mode-btn w-full bg-red-600 text-white font-semibold py-3 rounded-lg hover:bg-red-700 transition duration-300">
+          Iniciar Modo
+        </button>
+      </div>
+      
+      <!-- Modo Calibração -->
+      <div class="card p-6 text-center">
+        <div class="bg-purple-100 p-4 rounded-full w-20 h-20 mx-auto flex items-center justify-center mb-4">
+          <svg class="w-10 h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-800 mb-2">Calibrar Sensores</h3>
+        <p class="text-gray-600 mb-4">Calibre os sensores de toque do dispositivo.</p>
+        <button onclick="goToCalibration()" class="mode-btn w-full bg-purple-600 text-white font-semibold py-3 rounded-lg hover:bg-purple-700 transition duration-300">
+          Iniciar Calibração
+        </button>
+      </div>
+    </div>
+
+    <!-- Informações de conexão -->
+    <div class="card p-6 mb-8">
+      <h3 class="text-xl font-semibold text-gray-800 mb-4">Gerenciamento de Conexão</h3>
+      <p class="text-gray-600 mb-4">O sistema automaticamente desconecta o dispositivo quando não está em uso. Em caso de desconexão inesperada (como bateria fraca), o dispositivo será liberado após 5 minutos de inatividade.</p>
+      <button onclick="disconnectDevice()" class="bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-700 transition duration-300">
+        Desconectar Dispositivo
+      </button>
+    </div>
+  </div>
+
+  <footer class="text-center text-white py-4 mt-8">
+    <p>BoxeIoT &copy; 2023 - Sistema de Monitoramento de Sensores</p>
+  </footer>
+
+  <script>
+    // Variável global para controlar redirecionamentos
+    let isRedirecting = false;
+    
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBLsU5CMvKQOm9Qs9mu6X1K27fVI8WuBQg",
+      authDomain: "boxeiot.firebaseapp.com",
+      databaseURL: "https://boxeiot-default-rtdb.firebaseio.com",
+      projectId: "boxeiot",
+      storageBucket: "boxeiot.firebasestorage.app",
+      messagingSenderId: "510231005229",
+      appId: "1:510231005229:web:13e764df17a953ff9d50a4",
+      measurementId: "G-0LP6HCJKGR"
+    };
+
+    // Inicializa o Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const database = firebase.database();
+
+    // Variáveis globais
+    let user = null;
+    let deviceCode = null;
+    let deviceRef = null;
+    let userDeviceRef = null;
+    let disconnectTimeout = null;
+
+    // Verificar autenticação
+    firebase.auth().onAuthStateChanged((currentUser) => {
+      if (!currentUser) {
+        window.location.href = "login.html";
+      } else {
+        user = currentUser;
+        
+        // Verificar se há um dispositivo nos parâmetros da URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const deviceFromUrl = urlParams.get('device');
+        
+        // Verificar se há um dispositivo no sessionStorage
+        const storedDevice = sessionStorage.getItem('selectedDevice');
+        
+        if (deviceFromUrl) {
+          // Se veio da URL, usar esse dispositivo
+          deviceCode = deviceFromUrl;
+          sessionStorage.setItem('selectedDevice', deviceCode);
+          loadDeviceInfo(deviceCode);
+        } else if (storedDevice) {
+          // Se não veio da URL mas tem no sessionStorage, usar esse
+          deviceCode = storedDevice;
+          loadDeviceInfo(deviceCode);
+        } else {
+          // Se não tem dispositivo, redirecionar para seleção
+          window.location.href = "dispositivos.html";
+          return;
+        }
+        
+        // Configurar onDisconnect para liberar o dispositivo se a conexão cair
+        setupDisconnectHandler();
+      }
+    });
+
+    // Carregar informações do dispositivo
+    function loadDeviceInfo(deviceCode) {
+      // Buscar apelido do dispositivo na estrutura do usuário
+      database.ref('users/' + user.uid + '/dispositivos/' + deviceCode).once('value')
+        .then(snapshot => {
+          const deviceData = snapshot.val();
+          const apelido = deviceData ? deviceData.apelido : deviceCode;
+          document.getElementById('deviceName').textContent = apelido;
+          setupDeviceConnection();
+        })
+        .catch(error => {
+          console.error("Erro ao carregar informações do dispositivo:", error);
+          document.getElementById('deviceName').textContent = deviceCode;
+        });
+    }
+
+    // Configurar handler para desconexão
+    function setupDisconnectHandler() {
+      // Referência para rastrear a conexão do usuário
+      const userConnectionRef = database.ref('.info/connected');
+      
+      userConnectionRef.on('value', (snapshot) => {
+        if (snapshot.val() === false) {
+          // Usuário desconectado - liberar dispositivo após 5 minutos
+          if (deviceCode) {
+            setTimeout(() => {
+              releaseDevice();
+            }, 5 * 60 * 1000); // 5 minutos
+          }
+          return;
+        }
+        
+        // Usuário conectado - cancelar timeout anterior se existir
+        if (disconnectTimeout) {
+          clearTimeout(disconnectTimeout);
+          disconnectTimeout = null;
+        }
+      });
+    }
+
+    // Configurar conexão com o dispositivo
+    function setupDeviceConnection() {
+      if (!deviceCode) return;
+      
+      // Parar de monitorar a referência anterior, se existir
+      if (deviceRef) {
+        deviceRef.off();
+      }
+      
+      // Nova referência para o dispositivo selecionado
+      deviceRef = database.ref("devices/" + deviceCode);
+      userDeviceRef = database.ref("devices/" + deviceCode + "/usuario");
+      
+      // Monitorar status do dispositivo
+      deviceRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        const statusElement = document.getElementById('deviceStatus');
+        const statusValue = document.getElementById('statusValue');
+        
+        if (data && data.estado) {
+          statusElement.classList.remove('hidden');
+          
+          // Verificar se o dispositivo está conectado a outro usuário
+          if (data.usuario && data.usuario !== user.uid) {
+            statusValue.textContent = `Em uso por outro usuário (Modo: ${data.estado})`;
+            statusElement.className = "mt-4 p-4 rounded-lg bg-yellow-100 text-yellow-800";
+          } else {
+            statusValue.textContent = `Conectado (Modo: ${data.estado})`;
+            statusElement.className = "mt-4 p-4 rounded-lg bg-blue-100 text-blue-800";
+          }
+        } else {
+          statusElement.classList.add('hidden');
+        }
+      });
+      
+      // Conectar usuário ao dispositivo
+      userDeviceRef.set(user.uid)
+        .then(() => {
+          console.log("Usuário conectado ao dispositivo");
+        })
+        .catch(error => {
+          console.error("Erro ao conectar ao dispositivo:", error);
+        });
+    }
+
+    // Ir para a página de calibração
+    function goToCalibration() {
+      if (!deviceCode) {
+        alert("Nenhum dispositivo selecionado.");
+        return;
+      }
+      
+      // Verificar se o dispositivo está disponível
+      database.ref("devices/" + deviceCode + "/usuario").once('value')
+        .then(snapshot => {
+          const currentUser = snapshot.val();
+          
+          if (currentUser && currentUser !== user.uid) {
+            alert("Este dispositivo está sendo usado por outro usuário. Tente novamente mais tarde.");
+            return;
+          }
+
+          // Redirecionar para a página de calibração
+          isRedirecting = true;
+          window.location.href = "calibracao.html?device=" + deviceCode;
+        })
+        .catch(error => {
+          console.error("Erro ao verificar dispositivo:", error);
+          alert("Erro ao conectar com o dispositivo. Tente novamente.");
+        });
+    }
+
+    // Definir modo de treino
+    function setMode(mode) {
+      isRedirecting = true;
+      
+      if (!deviceCode) {
+        alert("Nenhum dispositivo selecionado.");
+        isRedirecting = false;
+        return;
+      }
+      
+      // Verificar se o dispositivo está disponível
+      database.ref("devices/" + deviceCode + "/usuario").once('value')
+        .then(snapshot => {
+          const currentUser = snapshot.val();
+          
+          if (currentUser && currentUser !== user.uid) {
+            alert("Este dispositivo está sendo usado por outro usuário. Tente novamente mais tarde.");
+            isRedirecting = false;
+            return;
+          }
+          
+          // Redirecionar para a página do modo selecionado
+          switch(mode) {
+            case 'tempo_reacao':
+              window.location.href = "tempodereacao.html?device=" + deviceCode;
+              break;
+            case 'foco':
+              window.location.href = "foco.html?device=" + deviceCode;
+              break;
+            case 'forca':
+              window.location.href = "forca.html?device=" + deviceCode;
+              break;
+          }
+        })
+        .catch(error => {
+          console.error("Erro ao verificar dispositivo:", error);
+          alert("Erro ao conectar com o dispositivo. Tente novamente.");
+          isRedirecting = false;
+        });
+    }
+
+    // Voltar para a página anterior
+    function goBack() {
+      isRedirecting = true;
+      window.location.href = "dispositivos.html";
+    }
+
+    // Alterar dispositivo
+    function changeDevice() {
+      isRedirecting = true;
+      // Liberar o dispositivo atual antes de mudar
+      releaseDevice();
+      // Redirecionar para a página de seleção
+      window.location.href = "dispositivos.html";
+    }
+
+    // Desconectar dispositivo
+    function disconnectDevice() {
+      if (!deviceCode) {
+        alert("Nenhum dispositivo selecionado.");
+        return;
+      }
+      
+      releaseDevice();
+      alert("Dispositivo desconectado com sucesso.");
+    }
+
+    // Liberar dispositivo
+    function releaseDevice() {
+      if (deviceCode) {
+        database.ref("devices/" + deviceCode).update({
+          estado: "disponivel",
+          usuario: null,
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        })
+        .then(() => {
+          console.log("Dispositivo liberado");
+        })
+        .catch(error => {
+          console.error("Erro ao liberar dispositivo:", error);
+        });
+      }
+    }
+
+    // Função de logout
+    function logout() {
+      // Liberar dispositivo antes de fazer logout
+      releaseDevice();
+      
+      firebase.auth().signOut()
+        .then(() => {
+          console.log("Logout bem-sucedido");
+          window.location.href = "login.html";
+        })
+        .catch(error => {
+          console.error("Erro no logout:", error);
+        });
+    }
+
+    // Liberar dispositivo quando a página for fechada/recarregada
+    window.addEventListener('beforeunload', () => {
+      if (!isRedirecting) {
+        releaseDevice();
+      }
+    });
+
+    // Verificar se o Firebase foi carregado corretamente
+    if (typeof firebase === 'undefined') {
+      console.error('Firebase não carregado!');
+      alert('Erro: Firebase não carregado. Recarregue a página.');
+    } else {
+      console.log('Firebase carregado com sucesso');
+    }
+  </script>
+</body>
+</html>
