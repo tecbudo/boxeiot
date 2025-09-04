@@ -1,41 +1,46 @@
 #include "Sensores.h"
 #include <Wire.h>
+#include <algorithm>
 
-
-// Definir pinos de toque e LED 
+// Definir pinos de toque (mantidos da versão anterior)
 const byte Sensores::pinosToque[NUM_SENSORES] = {T8, T6, T7, T10, T1, T5, T4, T2, T3};
-const byte Sensores::pinosLED[NUM_SENSORES] = {39, 37, 35, 33, 18, 16, 38, 36, 40};
 
 Sensores::Sensores() : mpu(ENDERECO_MPU6500) {
     // Inicializar arrays
     float limitesIniciais[NUM_SENSORES] = {20000,15000,20000,15000,20000,7000,20000,20000,20000};
-    for(int i = 0; i < NUM_SENSORES; i++) {
-        limitesToque[i] = limitesIniciais[i];
+    
     for(int i = 0; i < NUM_SENSORES; i++) {
         baselineToque[i] = 0;
         thresholdsToque[i] = limitesIniciais[i];
         sensorCalibrado[i] = false;
+        mediasToque[i] = 0;
+        limitesToque[i] = limitesIniciais[i];
+        
         for(int j = 0; j < 10; j++) {
             maxValoresToque[i][j] = 0;
         }
     }
-  }
+    
+    // Inicializar variáveis de calibração interativa
+    calibracaoInterativaAtiva = false;
+    tempoInicioCalibracao = 0;
+    sensoresCalibrados = 0;
+    
+    for(int i = 0; i < NUM_SENSORES; i++) {
+        contadorCapturas[i] = 0;
+    }
 }
 
 void Sensores::iniciar() {
-    // Inicializar LEDs
-    for(int i = 0; i < NUM_SENSORES; i++) {
-        pinMode(pinosLED[i], OUTPUT);
-        digitalWrite(pinosLED[i], LOW);
-    }
-    
-    // Resto da inicialização existente
+    // Inicializar MPU6500
     Wire.begin();
+    
     if (!mpu.init()) {
         Serial.println("MPU6500 não responde");
         return;
     }
     
+    // Configurar MPU6500
     mpu.autoOffsets();
     mpu.enableGyrDLPF();
     mpu.setGyrDLPF(MPU6500_DLPF_7);
@@ -44,23 +49,27 @@ void Sensores::iniciar() {
     mpu.setAccRange(MPU6500_ACC_RANGE_16G);
     mpu.enableAccDLPF(true);
     mpu.setAccDLPF(MPU6500_DLPF_7);
+    
+    Serial.println("Sensores inicializados");
 }
 
 void Sensores::coletarBaseline() {
     Serial.println("Coletando valores de repouso...");
+    
     for(int i = 0; i < NUM_SENSORES; i++) {
         long soma = 0;
+        
         for(int j = 0; j < 50; j++) {
             soma += touchRead(pinosToque[i]);
             delay(20);
         }
+        
         baselineToque[i] = soma / 50;
         Serial.printf("Sensor %s: Baseline = %d\n", nomesSensores[i].c_str(), baselineToque[i]);
         sensorCalibrado[i] = false;
     }
 }
 
-// Novos métodos para calibração interativa
 void Sensores::iniciarCalibracaoInterativa() {
     Serial.println("Iniciando calibração interativa...");
     calibracaoInterativaAtiva = true;
@@ -75,11 +84,6 @@ void Sensores::iniciarCalibracaoInterativa() {
     
     // Coletar baseline inicial
     coletarBaseline();
-    
-    // Acender todos os LEDs para indicar início da calibração
-    for (int i = 0; i < NUM_SENSORES; i++) {
-        ledOn(i);
-    }
     
     Serial.println("Toque em cada sensor para calibração...");
 }
@@ -116,7 +120,6 @@ bool Sensores::processarCalibracaoInterativa() {
                 std::sort(maxValoresToque[i], maxValoresToque[i] + 10);
                 sensorCalibrado[i] = true;
                 sensoresCalibrados++;
-                ledOff(i); // Apagar LED do sensor calibrado
                 Serial.printf("Sensor %d calibrado. Total: %d/%d\n", i, sensoresCalibrados, NUM_SENSORES);
             }
         }
@@ -145,23 +148,10 @@ int Sensores::getSensorCalibrado(int index) {
 
 void Sensores::finalizarCalibracaoInterativa() {
     calibracaoInterativaAtiva = false;
-    
-    // Apagar todos os LEDs
-    for (int i = 0; i < NUM_SENSORES; i++) {
-        ledOff(i);
-    }
-    
     Serial.println("Calibração interativa finalizada");
 }
 
-
-
 void Sensores::capturarToquesCalibracao() {
-    // Acender todos os LEDs para indicar início da calibração
-    for(int i = 0; i < NUM_SENSORES; i++) {
-        digitalWrite(pinosLED[i], HIGH);
-    }
-
     int sensoresCalibrados = 0;
     unsigned long tempoInicial = millis();
     int contadorCapturas[NUM_SENSORES] = {0};
@@ -183,7 +173,6 @@ void Sensores::capturarToquesCalibracao() {
                     std::sort(maxValoresToque[i], maxValoresToque[i] + 10);
                     sensorCalibrado[i] = true;
                     sensoresCalibrados++;
-                    digitalWrite(pinosLED[i], LOW);
                     Serial.printf("Sensor %s calibrado.\n", nomesSensores[i].c_str());
                 }
             }
@@ -219,8 +208,6 @@ void Sensores::calibrarSensoresToqueAvancado() {
     Serial.println("Calibração avançada concluída!");
 }
 
-
-
 void Sensores::calibrarSensoresToque() {
     for (int i = 0; i < NUM_SENSORES; i++) {
         uint32_t tempoInicial = millis();
@@ -247,17 +234,12 @@ int Sensores::detectarToque() {
     return -1;
 }
 
-
-void Sensores::ledOn(int pino) {
-  digitalWrite(sensores.pinosLED[pino], HIGH);
+float Sensores::lerSensorToque(int indice) {
+    if (indice < 0 || indice >= NUM_SENSORES) {
+        return -1;
+    }
+    return touchRead(pinosToque[indice]);
 }
-
-
-void Sensores::ledOff(int pino) {
-  digitalWrite(sensores.pinosLED[pino], LOW);
-}
-
-
 
 float Sensores::calcularForca() {
     static float maiorPico = 0;
@@ -360,6 +342,26 @@ void Sensores::ajusteDinamicoReferencias() {
             mediasToque[i] = (mediasToque[i] * 0.9) + (valorAtual * 0.1);
         }
     }
+}
+
+int Sensores::getBaseline(int indice) const {
+    if (indice < 0 || indice >= NUM_SENSORES) return -1;
+    return baselineToque[indice];
+}
+
+int Sensores::getThreshold(int indice) const {
+    if (indice < 0 || indice >= NUM_SENSORES) return -1;
+    return thresholdsToque[indice];
+}
+
+String Sensores::getNomeSensor(int indice) const {
+    if (indice < 0 || indice >= NUM_SENSORES) return "INVALIDO";
+    return nomesSensores[indice];
+}
+
+bool Sensores::isSensorCalibrado(int indice) const {
+    if (indice < 0 || indice >= NUM_SENSORES) return false;
+    return sensorCalibrado[indice];
 }
 
 Sensores sensores;

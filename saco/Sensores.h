@@ -22,22 +22,26 @@ public:
     float calcularForca();
     int detectarToque();
     void ajusteDinamicoReferencias();
-    void ledOn(int pino);
-    void ledOff(int pino);
     
-    // Novos métodos para calibração interativa
+    // Métodos para calibração interativa
     void iniciarCalibracaoInterativa();
     bool processarCalibracaoInterativa();
     int getProgressoCalibracao();
     int getSensorCalibrado(int index);
     void finalizarCalibracaoInterativa();
 
+    // Métodos para acesso aos dados dos sensores
+    int getBaseline(int indice) const;
+    int getThreshold(int indice) const;
+    String getNomeSensor(int indice) const;
+    bool isSensorCalibrado(int indice) const;
+
 private:
     int baselineToque[NUM_SENSORES];
     int maxValoresToque[NUM_SENSORES][10];
     int thresholdsToque[NUM_SENSORES];
     bool sensorCalibrado[NUM_SENSORES];
-    static const byte pinosLED[NUM_SENSORES];
+    
     static const byte pinosToque[NUM_SENSORES];
     
     float mediasToque[NUM_SENSORES];

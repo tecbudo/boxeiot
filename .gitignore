@@ -1,0 +1,10 @@
+# Arquivos de configuração sensíveis
+config.h
+/config.h
+*/config.h
+**/config.h
+
+# Outras exclusões padrão do Arduino/PlatformIO
+.pio
+.vscode
+.idea

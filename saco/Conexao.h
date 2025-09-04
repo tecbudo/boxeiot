@@ -16,12 +16,7 @@
 #include <NTPClient.h>
 #include <Firebase_ESP_Client.h>
 
-// Definições para Firebase
-#define FIREBASE_PROJECT_ID "boxeiot"
-#define API_KEY "AIzaSyBLsU5CMvKQOm9Qs9mu6X1K27fVI8WuBQg"
-#define DATABASE_URL "https://boxeiot-default-rtdb.firebaseio.com"
-#define USER_EMAIL "boxeiotesp@jbsantosfilho.com"
-#define USER_PASSWORD "123456789"
+#include "config.h"
 
 // Estrutura para medições
 struct Medicao {
@@ -48,6 +43,7 @@ public:
   void begin();
   bool isConnected();
   unsigned long getTimestamp();
+  String getTimeString();  // Nova função para obter data e hora formatada
   bool checkForCommands();
   bool checkForStopCommand();
   bool updateDeviceStatus(const String& status);
@@ -67,6 +63,7 @@ public:
   FirebaseAuth auth;
   FirebaseConfig config;
   Medicao currentMeasurement;
+  NTPClient timeClient;  // Tornando público para acesso
 
   String deviceId;
   String generateDeviceId();
@@ -75,7 +72,6 @@ public:
 private:
   WiFiManager wifiManager;
   WiFiUDP ntpUDP;
-  NTPClient timeClient;
   
   void setupWiFi();
   void setupTime();

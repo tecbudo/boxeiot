@@ -1,4 +1,5 @@
 #include "Conexao.h"
+#include <time.h>
 
 ConexaoManager conexao;
 
@@ -46,6 +47,10 @@ void ConexaoManager::setupTime() {
   if (tentativas < 5) {
     Serial.print("Tempo sincronizado: ");
     Serial.println(timeClient.getFormattedTime());
+    
+    // Configurar o fuso horário do sistema
+    setenv("TZ", "UTC-3", 1); // Configura para UTC-3 (Brasília)
+    tzset();
   } else {
     Serial.println("Não foi possível sincronizar com NTP. Usando tempo local.");
   }
@@ -86,6 +91,20 @@ bool ConexaoManager::isConnected() {
 
 unsigned long ConexaoManager::getTimestamp() {
   return timeClient.getEpochTime();
+}
+
+String ConexaoManager::getTimeString() {
+  if (timeClient.getEpochTime() == 0) {
+    return "Não sincronizado";
+  }
+
+  time_t epochTime = timeClient.getEpochTime();
+  struct tm timeinfo;
+  localtime_r(&epochTime, &timeinfo);
+
+  char buffer[25];
+  strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
+  return String(buffer);
 }
 
 bool ConexaoManager::checkForCommands() {
