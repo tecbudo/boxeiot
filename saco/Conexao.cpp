@@ -333,3 +333,15 @@ bool ConexaoManager::sendToFirebase(const String& path, bool value) {
 bool ConexaoManager::sendToFirebase(const String& path, FirebaseJson& json) {
   return Firebase.RTDB.setJSON(&fbdo, path.c_str(), &json);
 }
+String ConexaoManager::getDeviceState() {
+  if (!isConnected()) {
+    return "desconectado";
+  }
+  
+  String path = "/devices/" + deviceId + "/estado";
+  if (Firebase.RTDB.getString(&fbdo, path.c_str())) {
+    return fbdo.stringData();
+  }
+  
+  return "desconectado";
+}

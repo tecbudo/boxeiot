@@ -64,7 +64,7 @@ public:
   FirebaseConfig config;
   Medicao currentMeasurement;
   NTPClient timeClient;  // Tornando público para acesso
-
+  String getDeviceState();
   String deviceId;
   String generateDeviceId();
   

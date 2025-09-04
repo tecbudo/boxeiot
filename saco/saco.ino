@@ -143,61 +143,99 @@
    }
  }
  /**
- * @brief Tarefa para gerenciar a comunicação com Firebase - Versão Otimizada
+ * @brief Tarefa para gerenciar a comunicação com Firebase - Versão Refatorada
  */
 void tarefaComunicacao(void* arg) {
   unsigned long ultimaAtualizacaoHora = 0;
+  int ultimoStatus = 1; // Inicia como desconectado
   
   while (1) {
-    // Verificar comandos do Firebase
-    if (conexao.checkForCommands()) {
-      Medicao medicao = conexao.getCurrentMeasurement();  
-      
-      if (conexao.updateDeviceEx()) { 
-        Serial.print("Comando recebido: ");
-        Serial.println(medicao.tipo);
-        
-        // Obter todos os mutexes necessários primeiro
-        xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-        xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
-        
-        // Processar o tipo de medição uma única vez
-        if (medicao.tipo == "forca") {
-          setaDisplay.printlog("Comando: " + medicao.tipo);
-          setaDisplay.print("MODO FORÇA");
-          estadoAtual = Estado::Forca;
-        } 
-        else if (medicao.tipo == "precisao") {
-          setaDisplay.printlog("Comando: " + medicao.tipo);
-          setaDisplay.print("MODO PRECISÃO");
-          estadoAtual = Estado::Precisao;
-        } 
-        else if (medicao.tipo == "tempo_reacao") {
-          setaDisplay.printlog("Comando: " + medicao.tipo);
-          setaDisplay.print("MODO AGILIDADE");
-          estadoAtual = Estado::Agilidade;
-        } 
-        else if (medicao.tipo == "tCalibrar") {
-          setaDisplay.printlog("Comando: " + medicao.tipo);
-          setaDisplay.print("MODO CALIBRAÇÃO");
-          estadoAtual = Estado::Calibrar;
-        }
-        
-        // Liberar mutexes
-        xSemaphoreGive(xEstadoMutex);
-        xSemaphoreGive(xDisplayMutex);
-        
-        }
-    }
+    // Verificar se está conectado ao Firebase
+    bool conectado = conexao.isConnected();
     
-    
-    // Manter conexão ativa
-    if (!conexao.isConnected()) {
+    if (!conectado) {
+      // Tentar reconectar
       conexao.begin();
-      xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-      setaDisplay.printlog("Reconectando...");
-      xSemaphoreGive(xDisplayMutex);
+      
+      // Atualizar status para desconectado se necessário
+      if (ultimoStatus != 1) {
+        xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
+        setaDisplay.setStatus(1);
+        setaDisplay.printlog("Reconectando...");
+        xSemaphoreGive(xDisplayMutex);
+        ultimoStatus = 1;
+      }
+      
+      vTaskDelay(5000 / portTICK_PERIOD_MS); // Espera 5 segundos antes de tentar novamente
+      continue;
     }
+    
+    // Se conectado, verificar o estado do dispositivo
+    String estadoDispositivo = conexao.getDeviceState();
+    
+    // Atualizar o status de conexão no display
+    if (estadoDispositivo == "ocupado" && ultimoStatus != 3) {
+      xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
+      setaDisplay.setStatus(3); // App conectado
+      xSemaphoreGive(xDisplayMutex);
+      ultimoStatus = 3;
+    } 
+    else if (estadoDispositivo == "disponivel" && ultimoStatus != 2) {
+      xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
+      setaDisplay.setStatus(2); // Conectado ao Firebase
+      xSemaphoreGive(xDisplayMutex);
+      ultimoStatus = 2;
+    }
+    else if (estadoDispositivo == "manutencao" && ultimoStatus != 4) {
+      xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
+      setaDisplay.setStatus(4); // Modo manutenção
+      xSemaphoreGive(xDisplayMutex);
+      ultimoStatus = 4;
+    }
+    
+    // Só verificar comandos se o dispositivo estiver ocupado
+    if (estadoDispositivo == "ocupado") {
+      if (conexao.checkForCommands()) {
+        Medicao medicao = conexao.getCurrentMeasurement();  
+        
+        if (conexao.updateDeviceEx()) { 
+          Serial.print("Comando recebido: ");
+          Serial.println(medicao.tipo);
+          
+          // Obter todos os mutexes necessários primeiro
+          xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
+          xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
+          
+          // Processar o tipo de medição uma única vez
+          if (medicao.tipo == "forca") {
+            setaDisplay.printlog("Comando: " + medicao.tipo);
+            setaDisplay.print("MODO FORÇA");
+            estadoAtual = Estado::Forca;
+          } 
+          else if (medicao.tipo == "precisao") {
+            setaDisplay.printlog("Comando: " + medicao.tipo);
+            setaDisplay.print("MODO PRECISÃO");
+            estadoAtual = Estado::Precisao;
+          } 
+          else if (medicao.tipo == "tempo_reacao") {
+            setaDisplay.printlog("Comando: " + medicao.tipo);
+            setaDisplay.print("MODO AGILIDADE");
+            estadoAtual = Estado::Agilidade;
+          } 
+          else if (medicao.tipo == "tCalibrar") {
+            setaDisplay.printlog("Comando: " + medicao.tipo);
+            setaDisplay.print("MODO CALIBRAÇÃO");
+            estadoAtual = Estado::Calibrar;
+          }
+          
+          // Liberar mutexes
+          xSemaphoreGive(xEstadoMutex);
+          xSemaphoreGive(xDisplayMutex);
+        }
+      }
+    }
+    
+    
     
     vTaskDelay(1000 / portTICK_PERIOD_MS);
   }

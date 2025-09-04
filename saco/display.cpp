@@ -272,6 +272,15 @@ void SetaDisplay::desenharSimboloStatus(int status) {
       display.drawLine(SCREEN_WIDTH - 14, 12, SCREEN_WIDTH - 10, 16, WHITE);
       display.drawLine(SCREEN_WIDTH - 10, 16, SCREEN_WIDTH - 2, 8, WHITE);
       break;
+      
+    case 4: // Modo manutenção (Chave inglesa)
+      // Desenhar uma chave inglesa simples
+      display.drawLine(SCREEN_WIDTH - 14, 4, SCREEN_WIDTH - 10, 8, WHITE);
+      display.drawLine(SCREEN_WIDTH - 10, 8, SCREEN_WIDTH - 6, 4, WHITE);
+      display.drawLine(SCREEN_WIDTH - 6, 4, SCREEN_WIDTH - 2, 8, WHITE);
+      display.drawLine(SCREEN_WIDTH - 2, 8, SCREEN_WIDTH - 6, 12, WHITE);
+      display.drawLine(SCREEN_WIDTH - 6, 12, SCREEN_WIDTH - 10, 8, WHITE);
+      break;
   }
 }
 
