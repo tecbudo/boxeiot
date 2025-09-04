@@ -54,7 +54,7 @@ class SetaDisplay {
     void desenharLinhaEspessa(int x1, int y1, int x2, int y2);
     void atualizarAreaAmarela();
     void atualizarAreaAzul();
-
+    void desenharSimboloStatus(int status);
   public:
     SetaDisplay();
     void begin();
@@ -68,6 +68,8 @@ class SetaDisplay {
     void print(String mensagem);
     void printazul(String mensagem);
     void showtime(String timestamp);
+    void setStatus(int status); // 1: desconectado, 2: conectado Firebase, 3: app conectado
+  void showtimeCompact(String timestamp); // Nova função para tempo compacto
 };
 
-#endif
+#endif  

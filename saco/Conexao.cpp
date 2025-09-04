@@ -4,7 +4,7 @@
 ConexaoManager conexao;
 
 ConexaoManager::ConexaoManager() 
-  : timeClient(ntpUDP, "pool.ntp.org", -3 * 3600) {
+  : timeClient(ntpUDP, "pool.ntp.org", 0) {  // Alterado para UTC+0 br.pool.ntp.org
   deviceId = generateDeviceId();
 }
 
@@ -35,7 +35,7 @@ void ConexaoManager::setupWiFi() {
 
 void ConexaoManager::setupTime() {
   timeClient.begin();
-  timeClient.setTimeOffset(-3 * 3600);
+  timeClient.setTimeOffset(0);  // Mantido em UTC+0
   
   int tentativas = 0;
   while (!timeClient.forceUpdate() && tentativas < 5) {
@@ -45,11 +45,11 @@ void ConexaoManager::setupTime() {
   }
   
   if (tentativas < 5) {
-    Serial.print("Tempo sincronizado: ");
+    Serial.print("Tempo sincronizado (UTC): ");
     Serial.println(timeClient.getFormattedTime());
     
-    // Configurar o fuso horário do sistema
-    setenv("TZ", "UTC-3", 1); // Configura para UTC-3 (Brasília)
+    // Configurar o fuso horário do sistema para UTC-3 (Brasília)
+    setenv("TZ", "GMT+3", 1);
     tzset();
   } else {
     Serial.println("Não foi possível sincronizar com NTP. Usando tempo local.");
@@ -90,6 +90,7 @@ bool ConexaoManager::isConnected() {
 }
 
 unsigned long ConexaoManager::getTimestamp() {
+  // Retorna timestamp UTC (sem ajuste de fuso horário)
   return timeClient.getEpochTime();
 }
 
@@ -98,12 +99,14 @@ String ConexaoManager::getTimeString() {
     return "Não sincronizado";
   }
 
+  // Obtém o tempo UTC e aplica o fuso horário local
   time_t epochTime = timeClient.getEpochTime();
   struct tm timeinfo;
   localtime_r(&epochTime, &timeinfo);
 
-  char buffer[25];
-  strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
+  char buffer[20];
+  // Formato: Hora:Minuto:Segundo Dia/Mês
+  strftime(buffer, sizeof(buffer), "%H:%M:%S %d/%m", &timeinfo);
   return String(buffer);
 }
 

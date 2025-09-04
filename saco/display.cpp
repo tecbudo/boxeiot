@@ -244,3 +244,53 @@ void SetaDisplay::desenharSetaFrente() {
   display.drawCircle(centroX, centroY, 11, WHITE);
   display.fillCircle(centroX, centroY, 3, WHITE);
 }
+
+void SetaDisplay::setStatus(int status) {
+  // Limpa apenas a área do símbolo (canto superior direito)
+  display.fillRect(SCREEN_WIDTH - 16, 0, 16, YELLOW_AREA_HEIGHT, BLACK);
+  
+  // Desenha o símbolo correspondente
+  desenharSimboloStatus(status);
+  display.display();
+}
+
+void SetaDisplay::desenharSimboloStatus(int status) {
+  switch(status) {
+    case 1: // Desconectado (X)
+      display.drawLine(SCREEN_WIDTH - 14, 2, SCREEN_WIDTH - 2, 14, WHITE);
+      display.drawLine(SCREEN_WIDTH - 14, 14, SCREEN_WIDTH - 2, 2, WHITE);
+      break;
+      
+    case 2: // Conectado Firebase (✓)
+      display.drawLine(SCREEN_WIDTH - 14, 8, SCREEN_WIDTH - 10, 12, WHITE);
+      display.drawLine(SCREEN_WIDTH - 10, 12, SCREEN_WIDTH - 2, 4, WHITE);
+      break;
+      
+    case 3: // App conectado (✓✓)
+      display.drawLine(SCREEN_WIDTH - 14, 8, SCREEN_WIDTH - 10, 12, WHITE);
+      display.drawLine(SCREEN_WIDTH - 10, 12, SCREEN_WIDTH - 2, 4, WHITE);
+      display.drawLine(SCREEN_WIDTH - 14, 12, SCREEN_WIDTH - 10, 16, WHITE);
+      display.drawLine(SCREEN_WIDTH - 10, 16, SCREEN_WIDTH - 2, 8, WHITE);
+      break;
+  }
+}
+
+void SetaDisplay::showtimeCompact(String timestamp) {
+  // Atualiza apenas a área de texto (deixando espaço para o símbolo)
+  display.fillRect(0, 0, SCREEN_WIDTH - 18, YELLOW_AREA_HEIGHT, BLACK);
+  
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  
+  // Centraliza o texto na área disponível
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(timestamp, 0, 0, &x1, &y1, &w, &h);
+  
+  int x = (SCREEN_WIDTH - 18 - w) / 2;
+  int y = (YELLOW_AREA_HEIGHT - h) / 2;
+  
+  display.setCursor(x, y);
+  display.println(timestamp);
+  display.display();
+}

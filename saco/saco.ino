@@ -62,7 +62,7 @@
       vTaskDelay(4000/ portTICK_PERIOD_MS);
       String dataHora = conexao.getTimeString();
       xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-      setaDisplay.showtime(dataHora);
+      setaDisplay.showtimeCompact(dataHora);
       xSemaphoreGive(xDisplayMutex);
     }
  }
@@ -142,74 +142,71 @@
      vTaskDelay(100 / portTICK_PERIOD_MS);
    }
  }
- 
  /**
-  * @brief Tarefa para gerenciar a comunicação com Firebase
-  */
- void tarefaComunicacao(void* arg) {
-   unsigned long ultimaAtualizacaoHora = 0;
-   
-   while (1) {
-     // Verificar comandos do Firebase
-     if (conexao.checkForCommands()) {
-       Medicao medicao = conexao.getCurrentMeasurement();  
-       if (conexao.updateDeviceEx()) { 
-         Serial.print("Comando recebido: ");
-         Serial.println(medicao.tipo);
-         xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-         setaDisplay.printlog("Comando: " + medicao.tipo);
-         xSemaphoreGive(xDisplayMutex);
-         
-         // Mostrar tipo de medição no display
-         xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-         if (medicao.tipo == "forca") {
-           setaDisplay.print("MODO FORÇA");
-         } else if (medicao.tipo == "precisao") {
-           setaDisplay.print("MODO PRECISÃO");
-         } else if (medicao.tipo == "tempo_reacao") {
-           setaDisplay.print("MODO AGILIDADE");
-         } else if (medicao.tipo == "tCalibrar") {
-           setaDisplay.print("MODO CALIBRAÇÃO");
-         }
-         xSemaphoreGive(xDisplayMutex);
-       }
-       
-       // Definir estado com base no tipo de medição
-       xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
-       if (medicao.tipo == "forca") {
-         estadoAtual = Estado::Forca;
-       } else if (medicao.tipo == "precisao") {
-         estadoAtual = Estado::Precisao;
-       } else if (medicao.tipo == "tempo_reacao") {
-         estadoAtual = Estado::Agilidade;
-       } else if (medicao.tipo == "tCalibrar") {
-         estadoAtual = Estado::Calibrar;
-       }         
-       xSemaphoreGive(xEstadoMutex);
-       conexao.updateDeviceStatus("ocupado");
-       xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-       setaDisplay.printazul("conectado");
-       xSemaphoreGive(xDisplayMutex);
-     }
-     
-
-     // Manter conexão ativa
-     if (!conexao.isConnected()) {
-       conexao.begin();
-       xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-       setaDisplay.printlog("Reconectando...");
-       xSemaphoreGive(xDisplayMutex);
-     }
-     
-     vTaskDelay(1000 / portTICK_PERIOD_MS);
-   }
- }
+ * @brief Tarefa para gerenciar a comunicação com Firebase - Versão Otimizada
+ */
+void tarefaComunicacao(void* arg) {
+  unsigned long ultimaAtualizacaoHora = 0;
+  
+  while (1) {
+    // Verificar comandos do Firebase
+    if (conexao.checkForCommands()) {
+      Medicao medicao = conexao.getCurrentMeasurement();  
+      
+      if (conexao.updateDeviceEx()) { 
+        Serial.print("Comando recebido: ");
+        Serial.println(medicao.tipo);
+        
+        // Obter todos os mutexes necessários primeiro
+        xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
+        xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
+        
+        // Processar o tipo de medição uma única vez
+        if (medicao.tipo == "forca") {
+          setaDisplay.printlog("Comando: " + medicao.tipo);
+          setaDisplay.print("MODO FORÇA");
+          estadoAtual = Estado::Forca;
+        } 
+        else if (medicao.tipo == "precisao") {
+          setaDisplay.printlog("Comando: " + medicao.tipo);
+          setaDisplay.print("MODO PRECISÃO");
+          estadoAtual = Estado::Precisao;
+        } 
+        else if (medicao.tipo == "tempo_reacao") {
+          setaDisplay.printlog("Comando: " + medicao.tipo);
+          setaDisplay.print("MODO AGILIDADE");
+          estadoAtual = Estado::Agilidade;
+        } 
+        else if (medicao.tipo == "tCalibrar") {
+          setaDisplay.printlog("Comando: " + medicao.tipo);
+          setaDisplay.print("MODO CALIBRAÇÃO");
+          estadoAtual = Estado::Calibrar;
+        }
+        
+        // Liberar mutexes
+        xSemaphoreGive(xEstadoMutex);
+        xSemaphoreGive(xDisplayMutex);
+        
+        }
+    }
+    
+    
+    // Manter conexão ativa
+    if (!conexao.isConnected()) {
+      conexao.begin();
+      xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
+      setaDisplay.printlog("Reconectando...");
+      xSemaphoreGive(xDisplayMutex);
+    }
+    
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+  }
+}
  
  /**
   * @brief Tarefa que estuda o tempo de reação do usuario
   */
  void tarefaAgilidade(void* arg) {
-   pinMode(LED_BUILTIN, OUTPUT);
    
    while (1) {
      xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
@@ -218,26 +215,21 @@
      
      if (estadoLocal == Estado::Agilidade) {
        xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-       setaDisplay.print("AGUARDANDO...");
-       xSemaphoreGive(xDisplayMutex);
-       
-       digitalWrite(LED_BUILTIN, HIGH);
+       setaDisplay.printazul("Prepare-se...");
+      
        int intervalo = random(2000, 7000);
        delay(intervalo);
-       digitalWrite(LED_BUILTIN, LOW);
-       
+       setaDisplay.printazul("Ataque");  
+       xSemaphoreGive(xDisplayMutex);
        unsigned long tempoInicio = millis();
        int sensorTocado = -1;
-       
        while (sensorTocado < 0) {
          sensorTocado = sensores.detectarToque();
          vTaskDelay(10 / portTICK_PERIOD_MS);
-         
          // Verificar se ainda está no modo agilidade
          xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
          bool aindaNoModo = (estadoAtual == Estado::Agilidade);
          xSemaphoreGive(xEstadoMutex);
-         
          if (!aindaNoModo) {
            break; // Sai se o modo foi alterado
          }
@@ -253,7 +245,6 @@
          // Mostrar resultado no display
          xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
          setaDisplay.printazul("Tempo: " + String(tempoReacao) + "s");
-         setaDisplay.printlog("Reação: " + String(tempoReacao) + "s");
          xSemaphoreGive(xDisplayMutex);
        }
        
@@ -442,6 +433,7 @@
    setaDisplay.clear();
    setaDisplay.update();
    setaDisplay.print("INICIANDO...");
+   setaDisplay.setStatus(1);
    setaDisplay.printlog("Sistema iniciando");
    
    // Inicializar conexões
@@ -472,9 +464,8 @@
       xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
       setaDisplay.printlog("Hora: " + dataHora);
       xSemaphoreGive(xDisplayMutex);
-
-   setaDisplay.print("PRONTO");
-   
+  
+    
    // Iniciar tarefas
    xTaskCreate(tarefaPiscarLED, "tarefaPiscarLED", 4096, NULL, 1, NULL);
    xTaskCreate(tarefaComunicacao, "tarefaComunicacao", 8192, NULL, 2, NULL);
@@ -482,30 +473,17 @@
    xTaskCreate(tarefaPrecisao, "tarefaPrecisao", 4096, NULL, 1, NULL);
    xTaskCreate(tarefaForca, "tarefaForca", 4096, NULL, 1, NULL);
    xTaskCreate(tarefaCalibra, "tarefaCalibra", 4096, NULL, 1, NULL);
-   xTaskCreate(tarefaDataHora, "tarefaDataHora", 4096, NULL, 1, NULL);
-
-   
+   xTaskCreate(tarefaDataHora, "tarefaDataHora", 4096, NULL, 1, NULL);  
    Serial.println("Todas as tarefas iniciadas");
    setaDisplay.printlog("Sistema pronto");
+   conexao.updateDeviceStatus("disponivel");
+   setaDisplay.setStatus(2);
  }
  
  /**
   * @brief Função de loop principal
   */
  void loop() {
-   // Ajuste dinâmico das referências dos sensores
-   // sensores.ajusteDinamicoReferencias();
-   
-   // Mostrar "Em espera" quando inativo
-   xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
-   Estado estadoLocal = estadoAtual;
-   xSemaphoreGive(xEstadoMutex);
-   
-   if (estadoLocal == Estado::Inicial) {
-     xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-     setaDisplay.printazul("EM ESPERA");
-     xSemaphoreGive(xDisplayMutex);
-   }
    
    vTaskDelay(1000 / portTICK_PERIOD_MS);
  }
