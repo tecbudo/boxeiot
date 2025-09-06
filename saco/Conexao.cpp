@@ -249,8 +249,17 @@ bool ConexaoManager::sendPrecisionResult(bool acerto, unsigned long tempoRespost
   resultado.set("sensorTocado", sensorTocado);
   resultado.set("ledAlvo", ledAlvo);
   resultado.set("timestamp", getTimestamp());
+  resultado.set("usuario", currentMeasurement.usuario); // Incluir ID do usuário
   
-  return Firebase.RTDB.setJSON(&fbdo, path.c_str(), &resultado);
+  bool success = Firebase.RTDB.setJSON(&fbdo, path.c_str(), &resultado);
+  
+  // Limpar o LED atual após enviar o resultado
+  if (success) {
+    path = "/devices/" + deviceId + "/medicoes/ledIndex";
+    Firebase.RTDB.deleteNode(&fbdo, path.c_str());
+  }
+  
+  return success;
 }
 
 bool ConexaoManager::sendPrecisionFinalResult(int totalAcertos, int totalErros) {
@@ -345,3 +354,15 @@ String ConexaoManager::getDeviceState() {
   
   return "desconectado";
 }
+bool ConexaoManager::setMeasurementLed(int ledIndex) {
+  if (!isConnected()) return false;
+  
+  String path = "/devices/" + deviceId + "/medicoes";
+  FirebaseJson update;
+  update.set("ledIndex", ledIndex);
+  update.set("estado", "executando");
+  update.set("timestampInicio", getTimestamp());
+  
+  return Firebase.RTDB.updateNode(&fbdo, path.c_str(), &update);
+}
+

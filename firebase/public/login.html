@@ -82,9 +82,9 @@
       Continuar com Google
     </button>
 
-    <p class="text-center text-gray-500 mt-6 text-sm">
-      Não tem uma conta? <a href="cadastro.html${deviceCodeFromURL ? '?device=' + deviceCodeFromURL : ''}" class="text-blue-600 hover:underline">Cadastre-se</a>
-    </p>
+  <p class="text-center text-gray-500 mt-6 text-sm">
+  Não tem uma conta? <a href="cadastro.html" id="cadastroLink" class="text-blue-600 hover:underline">Cadastre-se</a>
+</p>
   </div>
 
   <script>
@@ -108,23 +108,32 @@
     // Variável para armazenar o código do dispositivo da URL
     let deviceCodeFromURL = null;
 
-    // Verificar parâmetros da URL ao carregar a página
-    document.addEventListener('DOMContentLoaded', function() {
-      const urlParams = new URLSearchParams(window.location.search);
-      deviceCodeFromURL = urlParams.get('device');
-      
-      if (deviceCodeFromURL) {
-        // Mostrar badge do dispositivo
-        const deviceBadge = document.getElementById('deviceBadge');
-        deviceBadge.classList.remove('hidden');
-        
-        // Mostrar mensagem informativa
-        showMessage('Dispositivo detectado! Após o login, ele será cadastrado automaticamente.', false);
-        
-        // Armazenar no sessionStorage para uso posterior (caso necessário)
-        sessionStorage.setItem('deviceCodeFromURL', deviceCodeFromURL);
-      }
-    });
+  // Verificar parâmetros da URL ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  deviceCodeFromURL = urlParams.get('device');
+  
+  if (deviceCodeFromURL) {
+    // Mostrar badge do dispositivo
+    const deviceBadge = document.getElementById('deviceBadge');
+    deviceBadge.classList.remove('hidden');
+    
+    // Mostrar mensagem informativa
+    showMessage('Dispositivo detectado! Após o login, ele será cadastrado automaticamente.', false);
+    
+    // Armazenar no sessionStorage para uso posterior (caso necessário)
+    sessionStorage.setItem('deviceCodeFromURL', deviceCodeFromURL);
+    
+    // ATUALIZAR LINK DE CADASTRO - CORREÇÃO DO BUG
+    const cadastroLink = document.getElementById('cadastroLink');
+    cadastroLink.href = `cadastro.html?device=${deviceCodeFromURL}`;
+  }
+// ATUALIZAR LINK DE CADASTRO - CORREÇÃO DO BUG
+const cadastroLink = document.getElementById('cadastroLink');
+if (deviceCodeFromURL && cadastroLink) {
+  cadastroLink.href = `cadastro.html?device=${deviceCodeFromURL}`;
+}
+});
 
     // Verificar se o usuário já está logado
     firebase.auth().onAuthStateChanged((user) => {

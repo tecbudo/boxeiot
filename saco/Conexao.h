@@ -57,6 +57,7 @@ public:
   bool clearPrecisionData();
   bool sendCalibrationProgress(int progresso, int total);
   bool sendSensorCalibrated(int sensorIndex);
+  bool setMeasurementLed(int ledIndex);
   Medicao getCurrentMeasurement();
 
   FirebaseData fbdo;
