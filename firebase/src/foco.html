@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Teste de Força - BoxeIoT</title>
- <link href="/styles.css" rel="stylesheet">
+  <title>Teste de Precisão - BoxeIoT</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body {
       font-family: 'Inter', sans-serif;
@@ -38,22 +39,8 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-    .timer-display {
-      font-size: 4rem;
-      font-weight: bold;
-      text-align: center;
-      margin: 2rem 0;
-      color: #1a2a6c;
-    }
-    .countdown-display {
+    .score-display {
       font-size: 3rem;
-      font-weight: bold;
-      text-align: center;
-      margin: 1rem 0;
-      color: #ef4444;
-    }
-    .force-display {
-      font-size: 5rem;
       font-weight: bold;
       text-align: center;
       margin: 1rem 0;
@@ -91,50 +78,36 @@
     .status-ocupado { background-color: #3B82F6; }
     .status-manutencao { background-color: #F59E0B; }
     .status-desconhecido { background-color: #9CA3AF; }
-    .saco-boxe {
-      width: 200px;
-      height: 300px;
-      background: linear-gradient(135deg, #8B4513, #A0522D);
-      border-radius: 50% 50% 40% 40%;
-      margin: 0 auto 20px;
-      position: relative;
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+    .led-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-gap: 15px;
+      margin: 20px auto;
+      max-width: 300px;
+    }
+    .led {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background-color: #e5e7eb;
+      border: 2px solid #9ca3af;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: white;
-      font-weight: bold;
-      font-size: 1.2rem;
-      text-align: center;
-      padding: 20px;
-      border: 10px solid #5D4037;
+      cursor: pointer;
+      transition: all 0.2s;
     }
-    .alvo {
-      width: 80px;
-      height: 80px;
-      background: radial-gradient(circle, #ef4444 0%, #b91c1c 70%);
-      border-radius: 50%;
-      border: 5px solid #ffffff;
-      box-shadow: 0 0 0 5px #dc2626;
-      animation: pulse 2s infinite;
+    .led.active {
+      background-color: #ef4444;
+      box-shadow: 0 0 20px #ef4444;
     }
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-      100% { transform: scale(1); }
+    .led.correct {
+      background-color: #10b981;
+      box-shadow: 0 0 20px #10b981;
     }
-    .progress-bar {
-      height: 20px;
-      background-color: #e5e7eb;
-      border-radius: 10px;
-      overflow: hidden;
-      margin: 20px 0;
-    }
-    .progress {
-      height: 100%;
-      background: linear-gradient(90deg, #10b981, #3b82f6, #ef4444);
-      border-radius: 10px;
-      transition: width 0.3s;
+    .led.wrong {
+      background-color: #3b82f6;
+      box-shadow: 0 0 20px #3b82f6;
     }
   </style>
   <!-- Scripts do Firebase na ordem correta -->
@@ -152,7 +125,7 @@
           <button onclick="goBack()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 mr-4">
             &larr; Voltar
           </button>
-          <h1 class="text-3xl font-bold text-gray-800">Teste de Força</h1>
+          <h1 class="text-3xl font-bold text-gray-800">Teste de Precisão</h1>
         </div>
         <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300">
           Sair
@@ -169,61 +142,57 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
       <!-- Painel de controle -->
       <div class="card p-6">
-        <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Medição de Força</h2>
+        <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Teste de Precisão</h2>
         
-        <!-- Representação do saco de boxe -->
-        <div class="saco-boxe">
-          <div class="alvo" id="target">
-            <div class="text-white text-xs flex items-center justify-center h-full">ACERTE O SACO</div>
+        <!-- Grid de LEDs -->
+        <div class="led-grid" id="ledGrid">
+          <!-- Os LEDs serão gerados via JavaScript -->
+        </div>
+        
+        <!-- Display de pontuação -->
+        <div class="score-display" id="scoreDisplay">
+          <div class="grid grid-cols-3 gap-4">
+            <div class="text-center">
+              <p class="text-sm text-gray-600">Acertos</p>
+              <p id="hitsCount" class="text-3xl font-bold text-green-600">0</p>
+            </div>
+            <div class="text-center">
+              <p class="text-sm text-gray-600">Erros</p>
+              <p id="missesCount" class="text-3xl font-bold text-red-600">0</p>
+            </div>
+            <div class="text-center">
+              <p class="text-sm text-gray-600">Pontuação</p>
+              <p id="totalScore" class="text-3xl font-bold text-blue-600">0</p>
+            </div>
           </div>
         </div>
         
-        <!-- Contador regressivo -->
-        <div class="countdown-display hidden" id="countdownDisplay">
-          30
-        </div>
-        
-        <!-- Display de força -->
-        <div class="force-display hidden" id="forceDisplay">
-          0.0
-        </div>
-        <div class="text-center text-gray-600 mb-4" id="forceUnit">kgf</div>
-        
-        <!-- Barra de progresso -->
-        <div class="progress-bar">
-          <div class="progress" id="forceProgress" style="width: 0%"></div>
-        </div>
-        <div class="flex justify-between text-sm text-gray-600 mb-6">
-          <span>0</span>
-          <span id="maxForceLabel">Força Máxima: 0 kgf</span>
-          <span>100</span>
+        <!-- Contador de tempo de treino -->
+        <div class="text-center text-xl font-semibold text-gray-700 mb-4">
+          Tempo de Treino: <span id="trainingTime">00:00</span>
         </div>
         
         <div class="flex justify-center gap-4 mb-6">
-          <button id="startBtn" onclick="solicitarMedicao()" class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300">
-            Iniciar Medição
+          <button id="startBtn" onclick="startTraining()" class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300">
+            Iniciar Treino
           </button>
-          <button id="resetBtn" onclick="resetMeasurement()" class="bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-700 transition duration-300" disabled>
-            Reiniciar
+          <button id="stopBtn" onclick="stopTraining()" class="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-700 transition duration-300" disabled>
+            Parar Treino
           </button>
         </div>
         
         <div id="measurementStatus" class="p-4 rounded-lg text-center hidden">
           <p id="statusMessage"></p>
         </div>
-        
-        <div id="resultDisplay" class="p-4 rounded-lg bg-green-100 text-green-800 text-center hidden">
-          <p class="font-bold">Força aplicada: <span id="resultForce">0</span> kgf</p>
-        </div>
       </div>
       
       <!-- Histórico de resultados -->
       <div class="card p-6">
-        <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Histórico de Medições</h2>
+        <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Histórico de Treinos</h2>
         
         <div class="mb-4 flex justify-between items-center">
           <span class="text-gray-700 font-medium">
-            Total: <span id="resultsCount">0</span> medições
+            Total: <span id="resultsCount">0</span> treinos
           </span>
           <button onclick="clearAllResults()" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition duration-300 text-sm">
             Limpar Tudo
@@ -231,16 +200,16 @@
         </div>
         
         <div id="resultsList" class="overflow-y-auto max-h-96">
-          <p class="text-gray-500 text-center py-8">Nenhuma medição realizada ainda.</p>
+          <p class="text-gray-500 text-center py-8">Nenhum treino realizado ainda.</p>
         </div>
       </div>
     </div>
 
-    <!-- Gráfico de Histórico de Força -->
+    <!-- Gráfico de Histórico de Pontuação -->
     <div class="card p-6 mt-6">
-      <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Histórico de Força Aplicada</h2>
+      <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Evolução da Pontuação</h2>
       <div class="chart-container" style="position: relative; height: 400px;">
-        <canvas id="forceChart"></canvas>
+        <canvas id="scoreChart"></canvas>
       </div>
     </div>
   </div>
@@ -250,16 +219,19 @@
   </footer>
 
   <script>
+    // Variáveis para controle de estado
+    let isTrainingActive = false;
+    let currentSessionId = null;
+    let hits = 0;
+    let misses = 0;
+    let score = 0;
+    let trainingStartTime = null;
+    let trainingTimerInterval = null;
     let currentMeasurementState = null;
     let measurementTimeout = null;
-    let countdownInterval = null;
-    let countdownTime = 30;
-    let maxForce = 0;
-    let forceChart = null;
-    
-    // Variável para controlar redirecionamentos
     let isRedirecting = false;
-
+    let scoreChart = null;
+    
     // Configuração do Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyBLsU5CMvKQOm9Qs9mu6X1K27fVI8WuBQg",
@@ -286,7 +258,6 @@
     let measurementListener = null;
     let resultsRef = null;
     let resultsListener = null;
-    let currentMeasurementId = null;
     let verifyConnectionInterval = null;
 
     // Verificar autenticação
@@ -315,10 +286,28 @@
         // Carregar histórico de resultados
         loadResultsHistory();
         
+        // Criar grid de LEDs
+        createLedGrid();
+        
         // Iniciar verificação periódica de conexão
         verifyConnectionInterval = setInterval(verifyDeviceConnection, 10000);
       }
     });
+
+    // Criar grid de LEDs
+    function createLedGrid() {
+      const ledGrid = document.getElementById('ledGrid');
+      ledGrid.innerHTML = '';
+      
+      for (let i = 1; i <= 9; i++) {
+        const led = document.createElement('div');
+        led.className = 'led';
+        led.id = `led-${i}`;
+        led.dataset.index = i;
+        led.addEventListener('click', () => handleLedClick(i));
+        ledGrid.appendChild(led);
+      }
+    }
 
     // Conectar ao dispositivo com controle de acesso exclusivo
     function connectToDeviceWithLock() {
@@ -374,8 +363,11 @@
           if (measurement && measurement.usuario === user.uid) {
             processMeasurementUpdate(measurement);
           } else {
-            // não há medição ativa → limpar interface
-            resetMeasurement();
+            // não há medição ativa
+            if (isTrainingActive && measurement && measurement.estado === "concluida") {
+              // Se o treino está ativo e recebemos uma conclusão, solicitar nova medição
+              setTimeout(() => solicitarMedicao(), 500);
+            }
           }
         });
         
@@ -393,98 +385,101 @@
 
     // Processar atualização de medição
     function processMeasurementUpdate(measurement) {
-      // Limpar timeout se a medição começou - DEVE VIR PRIMEIRO
-      if (measurement.estado === "executando" && measurementTimeout) {
+      if (measurementTimeout) {
         clearTimeout(measurementTimeout);
         measurementTimeout = null;
-        
-        // Iniciar contador regressivo
-        startCountdown();
       }
       
-      currentMeasurementState = measurement.estado; // Atualizar estado DEPOIS
+      currentMeasurementState = measurement.estado;
       
       switch(measurement.estado) {
         case "solicitada":
           updateMeasurementStatus("Medição solicitada. Aguardando dispositivo...", "info");
           break;
         case "executando":
-          updateMeasurementStatus("Medição em andamento... Acerte o alvo!", "warning");
+          updateMeasurementStatus("LED aceso! Toque no LED correspondente.", "warning");
+          // Destacar o LED que foi aceso no dispositivo
+          highlightLed(measurement.ledIndex);
           break;
         case "concluida":
-          if (measurement.valor) {
-            stopCountdown();
-            showResult(measurement.valor);
-            saveUserResult(measurement.valor);
-            // Limpar medição após processar
-            measurementRef.remove();
-            currentMeasurementState = null;
+          if (measurement.valor !== undefined) {
+            processMeasurementResult(measurement.valor);
+            // Se o treino ainda está ativo, solicitar nova medição automaticamente
+            if (isTrainingActive) {
+              setTimeout(() => solicitarMedicao(), 1000);
+            } else {
+              // Limpar medição após processar
+              measurementRef.remove();
+            }
           }
           break;
       }
+    }
+
+    // Destacar o LED que foi aceso no dispositivo físico
+    function highlightLed(ledIndex) {
+      // Remover destaque de todos os LEDs
+      document.querySelectorAll('.led').forEach(led => {
+        led.classList.remove('active', 'correct', 'wrong');
+      });
       
-      // Atualizar valor de força em tempo real se disponível
-      if (measurement.forca !== undefined) {
-        updateForceDisplay(measurement.forca);
+      // Destacar o LED correspondente
+      const ledElement = document.getElementById(`led-${ledIndex}`);
+      if (ledElement) {
+        ledElement.classList.add('active');
       }
     }
 
-    // Atualizar display de força
-    function updateForceDisplay(force) {
-      document.getElementById('forceDisplay').textContent = force.toFixed(1);
-      document.getElementById('forceProgress').style.width = `${Math.min(force, 100)}%`;
-      
-      // Atualizar força máxima
-      if (force > maxForce) {
-        maxForce = force;
-        document.getElementById('maxForceLabel').textContent = `Força Máxima: ${maxForce.toFixed(1)} kgf`;
-      }
-    }
-
-    // Iniciar contador regressivo
-    function startCountdown() {
-      // Mostrar elementos de medição
-      document.getElementById('countdownDisplay').classList.remove('hidden');
-      document.getElementById('forceDisplay').classList.remove('hidden');
-      document.getElementById('forceUnit').classList.remove('hidden');
-      
-      // Resetar contador e força máxima
-      countdownTime = 30;
-      maxForce = 0;
-      document.getElementById('countdownDisplay').textContent = countdownTime;
-      document.getElementById('forceDisplay').textContent = '0.0';
-      document.getElementById('forceProgress').style.width = '0%';
-      document.getElementById('maxForceLabel').textContent = 'Força Máxima: 0 kgf';
-      
-      // Iniciar contador
-      countdownInterval = setInterval(() => {
-        countdownTime--;
-        document.getElementById('countdownDisplay').textContent = countdownTime;
+    // Processar resultado da medição
+    function processMeasurementResult(result) {
+      if (result === 1) {
+        // Acerto
+        hits++;
+        document.getElementById('hitsCount').textContent = hits;
+        updateMeasurementStatus("Acerto! +1 ponto", "success");
         
-        if (countdownTime <= 0) {
-          // Tempo esgotado
-          stopCountdown();
-          showMessage("Tempo esgotado! Nenhum golpe detectado.", true);
-          resetMeasurement();
-        }
-      }, 1000);
-    }
-
-    // Parar contador regressivo
-    function stopCountdown() {
-      if (countdownInterval) {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
+        // Feedback visual - LED verde
+        document.querySelectorAll('.led.active').forEach(led => {
+          led.classList.remove('active');
+          led.classList.add('correct');
+        });
+      } else if (result === -1) {
+        // Erro
+        misses++;
+        document.getElementById('missesCount').textContent = misses;
+        updateMeasurementStatus("Erro! -1 ponto", "error");
+        
+        // Feedback visual - LED azul
+        document.querySelectorAll('.led.active').forEach(led => {
+          led.classList.remove('active');
+          led.classList.add('wrong');
+        });
       }
       
-      // Esconder elementos de medição
-      document.getElementById('countdownDisplay').classList.add('hidden');
-      document.getElementById('forceDisplay').classList.add('hidden');
-      document.getElementById('forceUnit').classList.add('hidden');
+      // Atualizar pontuação total
+      score = hits - misses;
+      document.getElementById('totalScore').textContent = score;
     }
 
-    // Solicitar medição
-    function solicitarMedicao() {
+    // Manipular clique em um LED
+    function handleLedClick(ledIndex) {
+      if (!isTrainingActive || currentMeasurementState !== "executando") {
+        return;
+      }
+      
+      // Enviar resposta para o dispositivo
+      const respostaRef = database.ref("devices/" + deviceCode + "/resposta");
+      respostaRef.set({
+        led: ledIndex,
+        usuario: user.uid,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      }).catch(error => {
+        console.error("Erro ao enviar resposta:", error);
+      });
+    }
+
+    // Iniciar treino
+    function startTraining() {
       if (!deviceCode) {
         showMessage('Nenhum dispositivo selecionado.', true);
         return;
@@ -503,33 +498,139 @@
           return;
         }
         
-        // Solicitar medição
-        const measurementData = {
-          tipo: "forca",
-          estado: "solicitada",
-          usuario: user.uid,
-          timestamp: firebase.database.ServerValue.TIMESTAMP
-        };
+        // Reiniciar contadores
+        hits = 0;
+        misses = 0;
+        score = 0;
+        document.getElementById('hitsCount').textContent = '0';
+        document.getElementById('missesCount').textContent = '0';
+        document.getElementById('totalScore').textContent = '0';
         
-        measurementRef.set(measurementData)
-          .then(() => {
-            console.log("Medição solicitada");
-            document.getElementById('startBtn').disabled = true;
-            document.getElementById('resetBtn').disabled = false;
-            currentMeasurementState = "solicitada";
-            
-            measurementTimeout = setTimeout(() => {
-              if (currentMeasurementState === "solicitada") {
-                showMessage("Dispositivo não respondeu. Tente novamente.", true);
-                resetMeasurement();
-              }
-            }, 10000); // 10 segundos de timeout
-          })
-          .catch(error => {
-            console.error("Erro ao solicitar medição:", error);
-            showMessage("Erro ao conectar com o dispositivo. Verifique a conexão e tente novamente.", true);
-          });
+        // Iniciar temporizador de treino
+        trainingStartTime = new Date().getTime();
+        startTrainingTimer();
+        
+        // Criar ID para esta sessão de treino
+        currentSessionId = new Date().getTime();
+        
+        // Ativar estado de treino
+        isTrainingActive = true;
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+        
+        // Solicitar primeira medição
+        solicitarMedicao();
       });
+    }
+
+    // Parar treino
+    function stopTraining() {
+      isTrainingActive = false;
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+      
+      // Parar temporizador de treino
+      stopTrainingTimer();
+      
+      // Salvar resultados do treino
+      saveTrainingSession();
+      
+      // Limpar medição atual se existir
+      if (measurementRef) {
+        measurementRef.remove().catch(error => {
+          console.error("Erro ao limpar medição:", error);
+        });
+      }
+      
+      // Limpar LEDs
+      document.querySelectorAll('.led').forEach(led => {
+        led.classList.remove('active', 'correct', 'wrong');
+      });
+      
+      updateMeasurementStatus("Treino finalizado. Pontuação: " + score, "success");
+    }
+
+    // Iniciar temporizador de treino
+    function startTrainingTimer() {
+      stopTrainingTimer(); // Garantir que não há outro temporizador ativo
+      
+      trainingTimerInterval = setInterval(() => {
+        const now = new Date().getTime();
+        const elapsed = Math.floor((now - trainingStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        document.getElementById('trainingTime').textContent = 
+          `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }, 1000);
+    }
+
+    // Parar temporizador de treino
+    function stopTrainingTimer() {
+      if (trainingTimerInterval) {
+        clearInterval(trainingTimerInterval);
+        trainingTimerInterval = null;
+      }
+    }
+
+    // Solicitar medição
+    function solicitarMedicao() {
+      if (!isTrainingActive || !deviceCode) {
+        return;
+      }
+      
+      // Solicitar medição
+      const measurementData = {
+        tipo: "precisao",
+        estado: "solicitada",
+        usuario: user.uid,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      };
+      
+      measurementRef.set(measurementData)
+        .then(() => {
+          console.log("Medição de precisão solicitada");
+          measurementTimeout = setTimeout(() => {
+            if (currentMeasurementState === "solicitada") {
+              showMessage("Dispositivo não respondeu. Tente novamente.", true);
+              if (isTrainingActive) {
+                setTimeout(() => solicitarMedicao(), 2000);
+              }
+            }
+          }, 10000); // 10 segundos de timeout
+        })
+        .catch(error => {
+          console.error("Erro ao solicitar medição:", error);
+          showMessage("Erro ao conectar com o dispositivo. Verifique a conexão e tente novamente.", true);
+          if (isTrainingActive) {
+            setTimeout(() => solicitarMedicao(), 2000);
+          }
+        });
+    }
+
+    // Salvar sessão de treino
+    function saveTrainingSession() {
+      if (!currentSessionId) return;
+      
+      const now = new Date().getTime();
+      const duration = Math.floor((now - trainingStartTime) / 1000);
+      
+      const sessionData = {
+        acertos: hits,
+        erros: misses,
+        pontuacao: score,
+        tempoTotal: duration,
+        timestampInicio: trainingStartTime,
+        timestampFim: now,
+        dispositivo: deviceCode
+      };
+      
+      database.ref('users/' + user.uid + '/treinos/precisao/' + currentSessionId).set(sessionData)
+        .then(() => {
+          console.log("Sessão de treino salva");
+        })
+        .catch(error => {
+          console.error("Erro ao salvar sessão de treino:", error);
+        });
     }
 
     // Atualizar status da medição na UI
@@ -538,7 +639,7 @@
       const statusMessage = document.getElementById('statusMessage');
       
       statusMessage.textContent = message;
-      statusElement.classList.remove('hidden', 'bg-blue-100', 'text-blue-800', 'bg-yellow-100', 'text-yellow-800', 'bg-green-100', 'text-green-800');
+      statusElement.classList.remove('hidden', 'bg-blue-100', 'text-blue-800', 'bg-yellow-100', 'text-yellow-800', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
       
       if (type === "info") {
         statusElement.classList.add('bg-blue-100', 'text-blue-800');
@@ -546,86 +647,11 @@
         statusElement.classList.add('bg-yellow-100', 'text-yellow-800');
       } else if (type === "success") {
         statusElement.classList.add('bg-green-100', 'text-green-800');
+      } else if (type === "error") {
+        statusElement.classList.add('bg-red-100', 'text-red-800');
       }
       
       statusElement.classList.remove('hidden');
-    }
-
-    // Mostrar resultado
-    function showResult(force) {
-      stopCountdown();
-      document.getElementById('resultForce').textContent = force.toFixed(1);
-      document.getElementById('resultDisplay').classList.remove('hidden');
-      document.getElementById('measurementStatus').classList.add('hidden');
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('resetBtn').disabled = false;
-      
-      updateMeasurementStatus(`Medição concluída: ${force.toFixed(1)} kgf`, "success");
-      setTimeout(() => {
-        document.getElementById('measurementStatus').classList.add('hidden');
-      }, 5000);
-    }
-
-    // Salvar resultado no histórico do usuário
-    function saveUserResult(force) {
-      const resultData = {
-        valor: force,
-        timestamp: firebase.database.ServerValue.TIMESTAMP,
-        dispositivo: deviceCode
-      };
-      
-      database.ref('users/' + user.uid + '/medicoes/forca/' + new Date().getTime()).set(resultData)
-        .then(() => {
-          console.log("Resultado salvo no histórico do usuário");
-        })
-        .catch(error => {
-          console.error("Erro ao salvar resultado:", error);
-        });
-    }
-
-    // Reiniciar medição
-    function resetMeasurement() {
-      console.log("Reiniciando medição...");
-      
-      // 1. Limpar timeout se existir
-      if (measurementTimeout) {
-        clearTimeout(measurementTimeout);
-        measurementTimeout = null;
-      }
-      
-      // 2. Parar contador regressivo
-      stopCountdown();
-      
-      // 3. Cancelar medição no Firebase se ainda estiver ativa
-      if (currentMeasurementState === "solicitada" || currentMeasurementState === "executando") {
-        console.log("Cancelando medição no Firebase...");
-        
-        // Remover a solicitação de medição do Firebase
-        measurementRef.remove().catch(error => {
-          console.error("Erro ao cancelar medição:", error);
-        });
-        
-        // Verificar se precisamos liberar o dispositivo
-        deviceRef.once('value').then(snapshot => {
-          const deviceData = snapshot.val();
-          if (deviceData && deviceData.usuario === user.uid) {
-            // Manter dispositivo ocupado mas sem medição ativa
-            deviceRef.update({
-              estado: "ocupado",
-              usuario: user.uid
-            });
-          }
-        });
-      }
-      
-      // 4. Resetar estado local
-      currentMeasurementState = null;
-      
-      // 5. Reativar interface
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('resetBtn').disabled = true;
-      document.getElementById('measurementStatus').classList.add('hidden');
-      document.getElementById('resultDisplay').classList.add('hidden');
     }
 
     // Atualizar status do dispositivo na UI
@@ -696,9 +722,9 @@
 
     // Carregar histórico de resultados
     function loadResultsHistory() {
-      resultsRef = database.ref('users/' + user.uid + '/medicoes/forca');
+      resultsRef = database.ref('users/' + user.uid + '/treinos/precisao');
       
-      resultsListener = resultsRef.orderByChild('timestamp').on('value', (snapshot) => {
+      resultsListener = resultsRef.orderByChild('timestampInicio').on('value', (snapshot) => {
         const results = snapshot.val() || {};
         const resultsList = document.getElementById('resultsList');
         const resultsCount = document.getElementById('resultsCount');
@@ -706,11 +732,11 @@
         resultsCount.textContent = Object.keys(results).length;
         
         if (Object.keys(results).length === 0) {
-          resultsList.innerHTML = '<p class="text-gray-500 text-center py-8">Nenhuma medição realizada ainda.</p>';
+          resultsList.innerHTML = '<p class="text-gray-500 text-center py-8">Nenhum treino realizado ainda.</p>';
           // Limpar gráfico se não houver dados
-          if (forceChart) {
-            forceChart.destroy();
-            forceChart = null;
+          if (scoreChart) {
+            scoreChart.destroy();
+            scoreChart = null;
           }
           return;
         }
@@ -718,76 +744,110 @@
         // Ordenar resultados por timestamp (mais recente primeiro)
         const sortedResults = Object.entries(results)
           .map(([key, value]) => ({ key, ...value }))
-          .sort((a, b) => b.timestamp - a.timestamp);
+          .sort((a, b) => b.timestampInicio - a.timestampInicio);
         
         // Limpar e preencher lista
         resultsList.innerHTML = '';
         
         sortedResults.forEach(result => {
           const resultElement = document.createElement('div');
-          resultElement.className = 'result-item p-4 border-b border-gray-200 flex justify-between items-center';
+          resultElement.className = 'result-item p-4 border-b border-gray-200';
           
-          const date = new Date(result.timestamp);
-          const formattedDate = date.toLocaleString('pt-BR');
+          const startDate = new Date(result.timestampInicio);
+          const formattedDate = startDate.toLocaleString('pt-BR');
+          const duration = Math.floor(result.tempoTotal / 60) + ':' + (result.tempoTotal % 60).toString().padStart(2, '0');
           
           resultElement.innerHTML = `
-            <div>
-              <p class="font-semibold">${result.valor.toFixed(1)} kgf</p>
-              <p class="text-sm text-gray-500">${formattedDate}</p>
-              ${result.dispositivo ? `<p class="text-sm text-gray-500">Dispositivo: ${result.dispositivo}</p>` : ''}
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="font-semibold">${formattedDate}</p>
+                <p class="text-sm text-gray-500">Duração: ${duration}</p>
+                ${result.dispositivo ? `<p class="text-sm text-gray-500">Dispositivo: ${result.dispositivo}</p>` : ''}
+              </div>
+              <div class="text-right">
+                <p class="text-sm">Acertos: <span class="font-semibold text-green-600">${result.acertos}</span></p>
+                <p class="text-sm">Erros: <span class="font-semibold text-red-600">${result.erros}</span></p>
+                <p class="text-sm">Pontuação: <span class="font-semibold text-blue-600">${result.pontuacao}</span></p>
+              </div>
             </div>
-            <button onclick="deleteResult('${result.key}')" class="text-red-600 hover:text-red-800">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-              </svg>
-            </button>
+            <div class="mt-2 text-right">
+              <button onclick="deleteResult('${result.key}')" class="text-red-600 hover:text-red-800 text-sm">
+                Excluir
+              </button>
+            </div>
           `;
           
           resultsList.appendChild(resultElement);
         });
         
         // Atualizar gráfico com os resultados
-        updateForceChart(results);
+        updateScoreChart(results);
       });
     }
 
-    function updateForceChart(results) {
-      const ctx = document.getElementById('forceChart').getContext('2d');
+    function updateScoreChart(results) {
+      const ctx = document.getElementById('scoreChart').getContext('2d');
       
       // Converter resultados para array e ordenar por timestamp
       const resultsArray = Object.entries(results)
         .map(([key, value]) => ({ key, ...value }))
-        .sort((a, b) => a.timestamp - b.timestamp);
+        .sort((a, b) => a.timestampInicio - b.timestampInicio);
       
       // Preparar dados para o gráfico
       const labels = resultsArray.map(result => {
-        const date = new Date(result.timestamp);
-        return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+        const date = new Date(result.timestampInicio);
+        return date.toLocaleDateString('pt-BR');
       });
       
-      const data = resultsArray.map(result => result.valor);
+      const scores = resultsArray.map(result => result.pontuacao);
+      const hitsData = resultsArray.map(result => result.acertos);
+      const missesData = resultsArray.map(result => result.erros);
       
       // Destruir gráfico anterior se existir
-      if (forceChart) {
-        forceChart.destroy();
+      if (scoreChart) {
+        scoreChart.destroy();
       }
       
       // Criar novo gráfico
-      forceChart = new Chart(ctx, {
+      scoreChart = new Chart(ctx, {
         type: 'line',
         data: {
           labels: labels,
-          datasets: [{
-            label: 'Força (kgf)',
-            data: data,
-            borderColor: 'rgb(239, 68, 68)',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            tension: 0.1,
-            fill: true,
-            pointBackgroundColor: 'rgb(239, 68, 68)',
-            pointRadius: 4,
-            pointHoverRadius: 6
-          }]
+          datasets: [
+            {
+              label: 'Pontuação',
+              data: scores,
+              borderColor: 'rgb(59, 130, 246)',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              tension: 0.1,
+              fill: true,
+              pointBackgroundColor: 'rgb(59, 130, 246)',
+              pointRadius: 4,
+              pointHoverRadius: 6
+            },
+            {
+              label: 'Acertos',
+              data: hitsData,
+              borderColor: 'rgb(16, 185, 129)',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              tension: 0.1,
+              fill: false,
+              pointBackgroundColor: 'rgb(16, 185, 129)',
+              pointRadius: 4,
+              pointHoverRadius: 6
+            },
+            {
+              label: 'Erros',
+              data: missesData,
+              borderColor: 'rgb(239, 68, 68)',
+              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              tension: 0.1,
+              fill: false,
+              pointBackgroundColor: 'rgb(239, 68, 68)',
+              pointRadius: 4,
+              pointHoverRadius: 6
+            }
+          ]
         },
         options: {
           responsive: true,
@@ -797,27 +857,14 @@
               beginAtZero: true,
               title: {
                 display: true,
-                text: 'Força (kgf)'
-              }
-            },
-            x: {
-              ticks: {
-                maxRotation: 45,
-                minRotation: 45
+                text: 'Contagem'
               }
             }
           },
           plugins: {
             title: {
               display: true,
-              text: 'Evolução da Força Aplicada'
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  return `Força: ${context.parsed.y.toFixed(1)} kgf`;
-                }
-              }
+              text: 'Evolução do Desempenho'
             }
           }
         }
@@ -827,7 +874,7 @@
     // Excluir resultado individual
     function deleteResult(resultKey) {
       if (confirm('Tem certeza que deseja excluir este resultado?')) {
-        database.ref('users/' + user.uid + '/medicoes/forca/' + resultKey).remove()
+        database.ref('users/' + user.uid + '/treinos/precisao/' + resultKey).remove()
           .then(() => {
             console.log("Resultado excluído");
             // O gráfico será atualizado automaticamente pelo listener
@@ -842,15 +889,15 @@
     // Limpar todos os resultados
     function clearAllResults() {
       if (confirm('Tem certeza que deseja excluir todos os resultados? Esta ação não pode ser desfeita.')) {
-        database.ref('users/' + user.uid + '/medicoes/forca').remove()
+        database.ref('users/' + user.uid + '/treinos/precisao').remove()
           .then(() => {
             console.log("Todos os resultados foram excluídos");
             showMessage("Todos os resultados foram excluídos.", false);
             
             // Limpar gráfico
-            if (forceChart) {
-              forceChart.destroy();
-              forceChart = null;
+            if (scoreChart) {
+              scoreChart.destroy();
+              scoreChart = null;
             }
           })
           .catch(error => {
@@ -891,22 +938,26 @@
 
     // Voltar para a página anterior
     function goBack() {
+      // Parar treino se estiver ativo
+      if (isTrainingActive) {
+        stopTraining();
+      }
+      
       isRedirecting = true;
       window.location.href = "index.html";
     }
 
     // Função de logout
     function logout() {
+      // Parar treino se estiver ativo
+      if (isTrainingActive) {
+        stopTraining();
+      }
+      
       // Parar verificação de conexão
       if (verifyConnectionInterval) {
         clearInterval(verifyConnectionInterval);
         verifyConnectionInterval = null;
-      }
-      
-      // Parar contador regressivo se estiver ativo
-      if (countdownInterval) {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
       }
       
       // Remover listeners
@@ -948,6 +999,11 @@
     // Liberar recursos quando a página for fechada/recarregada
     window.addEventListener('beforeunload', () => {
       if (!isRedirecting && deviceCode && user) {
+        // Parar treino se estiver ativo
+        if (isTrainingActive) {
+          stopTraining();
+        }
+        
         // Verificar se ainda somos os proprietários antes de liberar
         deviceRef.once('value').then(snapshot => {
           const deviceData = snapshot.val();

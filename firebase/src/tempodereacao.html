@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Teste de Força - BoxeIoT</title>
- <link href="/styles.css" rel="stylesheet">
+  <title>Tempo de Reação - BoxeIoT</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body {
       font-family: 'Inter', sans-serif;
@@ -45,25 +46,19 @@
       margin: 2rem 0;
       color: #1a2a6c;
     }
-    .countdown-display {
-      font-size: 3rem;
-      font-weight: bold;
-      text-align: center;
-      margin: 1rem 0;
-      color: #ef4444;
-    }
-    .force-display {
-      font-size: 5rem;
-      font-weight: bold;
-      text-align: center;
-      margin: 1rem 0;
-      color: #1a2a6c;
-    }
     .result-item {
       transition: all 0.3s;
     }
     .result-item:hover {
       background-color: #f0f0f0;
+    }
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
     }
     .flash-message {
       position: fixed;
@@ -91,51 +86,6 @@
     .status-ocupado { background-color: #3B82F6; }
     .status-manutencao { background-color: #F59E0B; }
     .status-desconhecido { background-color: #9CA3AF; }
-    .saco-boxe {
-      width: 200px;
-      height: 300px;
-      background: linear-gradient(135deg, #8B4513, #A0522D);
-      border-radius: 50% 50% 40% 40%;
-      margin: 0 auto 20px;
-      position: relative;
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: bold;
-      font-size: 1.2rem;
-      text-align: center;
-      padding: 20px;
-      border: 10px solid #5D4037;
-    }
-    .alvo {
-      width: 80px;
-      height: 80px;
-      background: radial-gradient(circle, #ef4444 0%, #b91c1c 70%);
-      border-radius: 50%;
-      border: 5px solid #ffffff;
-      box-shadow: 0 0 0 5px #dc2626;
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-      100% { transform: scale(1); }
-    }
-    .progress-bar {
-      height: 20px;
-      background-color: #e5e7eb;
-      border-radius: 10px;
-      overflow: hidden;
-      margin: 20px 0;
-    }
-    .progress {
-      height: 100%;
-      background: linear-gradient(90deg, #10b981, #3b82f6, #ef4444);
-      border-radius: 10px;
-      transition: width 0.3s;
-    }
   </style>
   <!-- Scripts do Firebase na ordem correta -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -152,7 +102,7 @@
           <button onclick="goBack()" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition duration-300 mr-4">
             &larr; Voltar
           </button>
-          <h1 class="text-3xl font-bold text-gray-800">Teste de Força</h1>
+          <h1 class="text-3xl font-bold text-gray-800">Tempo de Reação</h1>
         </div>
         <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-300">
           Sair
@@ -169,34 +119,10 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
       <!-- Painel de controle -->
       <div class="card p-6">
-        <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Medição de Força</h2>
+        <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Medição de Tempo de Reação</h2>
         
-        <!-- Representação do saco de boxe -->
-        <div class="saco-boxe">
-          <div class="alvo" id="target">
-            <div class="text-white text-xs flex items-center justify-center h-full">ACERTE O SACO</div>
-          </div>
-        </div>
-        
-        <!-- Contador regressivo -->
-        <div class="countdown-display hidden" id="countdownDisplay">
-          30
-        </div>
-        
-        <!-- Display de força -->
-        <div class="force-display hidden" id="forceDisplay">
-          0.0
-        </div>
-        <div class="text-center text-gray-600 mb-4" id="forceUnit">kgf</div>
-        
-        <!-- Barra de progresso -->
-        <div class="progress-bar">
-          <div class="progress" id="forceProgress" style="width: 0%"></div>
-        </div>
-        <div class="flex justify-between text-sm text-gray-600 mb-6">
-          <span>0</span>
-          <span id="maxForceLabel">Força Máxima: 0 kgf</span>
-          <span>100</span>
+        <div class="timer-display" id="timerDisplay">
+          --:--
         </div>
         
         <div class="flex justify-center gap-4 mb-6">
@@ -213,7 +139,7 @@
         </div>
         
         <div id="resultDisplay" class="p-4 rounded-lg bg-green-100 text-green-800 text-center hidden">
-          <p class="font-bold">Força aplicada: <span id="resultForce">0</span> kgf</p>
+          <p class="font-bold">Tempo de reação: <span id="resultTime">0</span> segundos</p>
         </div>
       </div>
       
@@ -234,14 +160,15 @@
           <p class="text-gray-500 text-center py-8">Nenhuma medição realizada ainda.</p>
         </div>
       </div>
-    </div>
-
-    <!-- Gráfico de Histórico de Força -->
-    <div class="card p-6 mt-6">
-      <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Histórico de Força Aplicada</h2>
-      <div class="chart-container" style="position: relative; height: 400px;">
-        <canvas id="forceChart"></canvas>
-      </div>
+      <!-- Gráfico de Histórico de Tempo de Reação -->
+<div class="card p-6 mt-6">
+  <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Histórico de Tempos de Reação</h2>
+  <div class="chart-container" style="position: relative; height: 400px;">
+    <canvas id="reactionTimeChart"></canvas>
+  </div>
+</div>
+      
+      
     </div>
   </div>
 
@@ -250,16 +177,11 @@
   </footer>
 
   <script>
-    let currentMeasurementState = null;
-    let measurementTimeout = null;
-    let countdownInterval = null;
-    let countdownTime = 30;
-    let maxForce = 0;
-    let forceChart = null;
-    
+	let currentMeasurementState = null;
+    let measurementTimeout = null;  
     // Variável para controlar redirecionamentos
     let isRedirecting = false;
-
+    let reactionTimeChart = null;
     // Configuração do Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyBLsU5CMvKQOm9Qs9mu6X1K27fVI8WuBQg",
@@ -288,6 +210,8 @@
     let resultsListener = null;
     let currentMeasurementId = null;
     let verifyConnectionInterval = null;
+    let timerInterval = null;
+    let startTime = null;
 
     // Verificar autenticação
     firebase.auth().onAuthStateChanged((currentUser) => {
@@ -373,10 +297,10 @@
           const measurement = snapshot.val();
           if (measurement && measurement.usuario === user.uid) {
             processMeasurementUpdate(measurement);
-          } else {
-            // não há medição ativa → limpar interface
-            resetMeasurement();
-          }
+          }else {
+    // não há medição ativa → limpar interface
+    resetMeasurement();
+  }
         });
         
         // Registrar usuário na lista de conexões
@@ -392,145 +316,84 @@
     }
 
     // Processar atualização de medição
-    function processMeasurementUpdate(measurement) {
-      // Limpar timeout se a medição começou - DEVE VIR PRIMEIRO
-      if (measurement.estado === "executando" && measurementTimeout) {
-        clearTimeout(measurementTimeout);
-        measurementTimeout = null;
-        
-        // Iniciar contador regressivo
-        startCountdown();
+ function processMeasurementUpdate(measurement) {
+  // Limpar timeout se a medição começou - DEVE VIR PRIMEIRO
+  if (measurement.estado === "executando" && measurementTimeout) {
+    clearTimeout(measurementTimeout);
+    measurementTimeout = null;
+  }
+  
+  currentMeasurementState = measurement.estado; // Atualizar estado DEPOIS
+  
+  switch(measurement.estado) {
+    case "solicitada":
+      updateMeasurementStatus("Medição solicitada. Aguardando dispositivo...", "info");
+      break;
+    case "executando":
+      updateMeasurementStatus("Medição em andamento...", "warning");
+      startVisualTimer();
+      break;
+    case "concluida":
+      if (measurement.valor) {
+        stopVisualTimer();   
+        showResult(measurement.valor);
+        saveUserResult(measurement.valor);
+        // Limpar medição após processar
+        measurementRef.remove();
+        currentMeasurementState = null;
       }
-      
-      currentMeasurementState = measurement.estado; // Atualizar estado DEPOIS
-      
-      switch(measurement.estado) {
-        case "solicitada":
-          updateMeasurementStatus("Medição solicitada. Aguardando dispositivo...", "info");
-          break;
-        case "executando":
-          updateMeasurementStatus("Medição em andamento... Acerte o alvo!", "warning");
-          break;
-        case "concluida":
-          if (measurement.valor) {
-            stopCountdown();
-            showResult(measurement.valor);
-            saveUserResult(measurement.valor);
-            // Limpar medição após processar
-            measurementRef.remove();
-            currentMeasurementState = null;
-          }
-          break;
-      }
-      
-      // Atualizar valor de força em tempo real se disponível
-      if (measurement.forca !== undefined) {
-        updateForceDisplay(measurement.forca);
-      }
-    }
-
-    // Atualizar display de força
-    function updateForceDisplay(force) {
-      document.getElementById('forceDisplay').textContent = force.toFixed(1);
-      document.getElementById('forceProgress').style.width = `${Math.min(force, 100)}%`;
-      
-      // Atualizar força máxima
-      if (force > maxForce) {
-        maxForce = force;
-        document.getElementById('maxForceLabel').textContent = `Força Máxima: ${maxForce.toFixed(1)} kgf`;
-      }
-    }
-
-    // Iniciar contador regressivo
-    function startCountdown() {
-      // Mostrar elementos de medição
-      document.getElementById('countdownDisplay').classList.remove('hidden');
-      document.getElementById('forceDisplay').classList.remove('hidden');
-      document.getElementById('forceUnit').classList.remove('hidden');
-      
-      // Resetar contador e força máxima
-      countdownTime = 30;
-      maxForce = 0;
-      document.getElementById('countdownDisplay').textContent = countdownTime;
-      document.getElementById('forceDisplay').textContent = '0.0';
-      document.getElementById('forceProgress').style.width = '0%';
-      document.getElementById('maxForceLabel').textContent = 'Força Máxima: 0 kgf';
-      
-      // Iniciar contador
-      countdownInterval = setInterval(() => {
-        countdownTime--;
-        document.getElementById('countdownDisplay').textContent = countdownTime;
-        
-        if (countdownTime <= 0) {
-          // Tempo esgotado
-          stopCountdown();
-          showMessage("Tempo esgotado! Nenhum golpe detectado.", true);
-          resetMeasurement();
-        }
-      }, 1000);
-    }
-
-    // Parar contador regressivo
-    function stopCountdown() {
-      if (countdownInterval) {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
-      }
-      
-      // Esconder elementos de medição
-      document.getElementById('countdownDisplay').classList.add('hidden');
-      document.getElementById('forceDisplay').classList.add('hidden');
-      document.getElementById('forceUnit').classList.add('hidden');
-    }
+      break;
+  }
+}
 
     // Solicitar medição
-    function solicitarMedicao() {
-      if (!deviceCode) {
-        showMessage('Nenhum dispositivo selecionado.', true);
-        return;
-      }
-      
-      // Verificar se ainda temos acesso ao dispositivo
-      deviceRef.once('value').then(snapshot => {
-        const deviceData = snapshot.val();
-        
-        if (!deviceData || deviceData.estado !== "ocupado" || deviceData.usuario !== user.uid) {
-          showMessage("Você perdeu o acesso ao dispositivo. Redirecionando...", true);
-          setTimeout(() => {
-            isRedirecting = true;
-            window.location.href = "index.html";
-          }, 2000);
-          return;
-        }
-        
-        // Solicitar medição
-        const measurementData = {
-          tipo: "forca",
-          estado: "solicitada",
-          usuario: user.uid,
-          timestamp: firebase.database.ServerValue.TIMESTAMP
-        };
-        
-        measurementRef.set(measurementData)
-          .then(() => {
-            console.log("Medição solicitada");
-            document.getElementById('startBtn').disabled = true;
-            document.getElementById('resetBtn').disabled = false;
-            currentMeasurementState = "solicitada";
-            
-            measurementTimeout = setTimeout(() => {
-              if (currentMeasurementState === "solicitada") {
-                showMessage("Dispositivo não respondeu. Tente novamente.", true);
-                resetMeasurement();
-              }
-            }, 10000); // 10 segundos de timeout
-          })
-          .catch(error => {
-            console.error("Erro ao solicitar medição:", error);
-            showMessage("Erro ao conectar com o dispositivo. Verifique a conexão e tente novamente.", true);
-          });
-      });
+  function solicitarMedicao() {
+  if (!deviceCode) {
+    showMessage('Nenhum dispositivo selecionado.', true);
+    return;
+  }
+
+  // Verificar explicitamente o estado do dispositivo antes de solicitar
+  deviceRef.once('value').then(snapshot => {
+    const deviceData = snapshot.val();
+    
+    if (!deviceData || deviceData.estado !== "ocupado" || deviceData.usuario !== user.uid) {
+      // Tentar reconectar se perdemos o acesso
+      connectToDeviceWithLock();
+      showMessage("Reconectando ao dispositivo...", false);
+      return;
     }
+
+    // Resto do código para solicitar medição...
+    const measurementData = {
+      tipo: "tempo_reacao",
+      estado: "solicitada",
+      usuario: user.uid,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    };
+
+    measurementRef.set(measurementData)
+      .then(() => {
+        console.log("Medição solicitada");
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('resetBtn').disabled = false;
+        currentMeasurementState = "solicitada";
+        
+        // Resetar timeout
+        if (measurementTimeout) clearTimeout(measurementTimeout);
+        measurementTimeout = setTimeout(() => {
+          if (currentMeasurementState === "solicitada") {
+            showMessage("Dispositivo não respondeu. Tente novamente.", true);
+            resetMeasurement();
+          }
+        }, 10000);
+      })
+      .catch(error => {
+        console.error("Erro ao solicitar medição:", error);
+        showMessage("Erro ao conectar com o dispositivo. Verifique a conexão e tente novamente.", true);
+      });
+  });
+}
 
     // Atualizar status da medição na UI
     function updateMeasurementStatus(message, type = "info") {
@@ -552,29 +415,29 @@
     }
 
     // Mostrar resultado
-    function showResult(force) {
-      stopCountdown();
-      document.getElementById('resultForce').textContent = force.toFixed(1);
-      document.getElementById('resultDisplay').classList.remove('hidden');
-      document.getElementById('measurementStatus').classList.add('hidden');
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('resetBtn').disabled = false;
-      
-      updateMeasurementStatus(`Medição concluída: ${force.toFixed(1)} kgf`, "success");
-      setTimeout(() => {
-        document.getElementById('measurementStatus').classList.add('hidden');
-      }, 5000);
-    }
-
+  function showResult(time) {
+  // PARAR CONTADOR VISUAL IMEDIATAMENTE
+  stopVisualTimer();
+  document.getElementById('resultTime').textContent = time.toFixed(3);
+  document.getElementById('resultDisplay').classList.remove('hidden');
+  document.getElementById('measurementStatus').classList.add('hidden');
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('resetBtn').disabled = false;
+  
+  updateMeasurementStatus(`Medição concluída: ${time.toFixed(3)} segundos`, "success");
+  setTimeout(() => {
+    document.getElementById('measurementStatus').classList.add('hidden');
+  }, 5000);
+}
     // Salvar resultado no histórico do usuário
-    function saveUserResult(force) {
+    function saveUserResult(time) {
       const resultData = {
-        valor: force,
+        valor: time,
         timestamp: firebase.database.ServerValue.TIMESTAMP,
         dispositivo: deviceCode
       };
       
-      database.ref('users/' + user.uid + '/medicoes/forca/' + new Date().getTime()).set(resultData)
+      database.ref('users/' + user.uid + '/medicoes/tempo_reacao/' + new Date().getTime()).set(resultData)
         .then(() => {
           console.log("Resultado salvo no histórico do usuário");
         })
@@ -584,48 +447,73 @@
     }
 
     // Reiniciar medição
-    function resetMeasurement() {
-      console.log("Reiniciando medição...");
-      
-      // 1. Limpar timeout se existir
-      if (measurementTimeout) {
-        clearTimeout(measurementTimeout);
-        measurementTimeout = null;
-      }
-      
-      // 2. Parar contador regressivo
-      stopCountdown();
-      
-      // 3. Cancelar medição no Firebase se ainda estiver ativa
-      if (currentMeasurementState === "solicitada" || currentMeasurementState === "executando") {
-        console.log("Cancelando medição no Firebase...");
-        
-        // Remover a solicitação de medição do Firebase
-        measurementRef.remove().catch(error => {
-          console.error("Erro ao cancelar medição:", error);
-        });
-        
-        // Verificar se precisamos liberar o dispositivo
-        deviceRef.once('value').then(snapshot => {
-          const deviceData = snapshot.val();
-          if (deviceData && deviceData.usuario === user.uid) {
-            // Manter dispositivo ocupado mas sem medição ativa
-            deviceRef.update({
-              estado: "ocupado",
-              usuario: user.uid
-            });
-          }
+  function resetMeasurement() {
+  console.log("Reiniciando medição...");
+  
+  // 1. Limpar timeout se existir
+  if (measurementTimeout) {
+    clearTimeout(measurementTimeout);
+    measurementTimeout = null;
+  }
+  
+  // 2. Cancelar medição no Firebase se ainda estiver ativa
+  if (currentMeasurementState === "solicitada" || currentMeasurementState === "executando") {
+    console.log("Cancelando medição no Firebase...");
+    
+    // Remover a solicitação de medição do Firebase
+    measurementRef.remove().catch(error => {
+      console.error("Erro ao cancelar medição:", error);
+    });
+    
+    // Verificar se precisamos liberar o dispositivo
+    deviceRef.once('value').then(snapshot => {
+      const deviceData = snapshot.val();
+      if (deviceData && deviceData.usuario === user.uid) {
+        // Manter dispositivo ocupado mas sem medição ativa
+        deviceRef.update({
+          estado: "ocupado",
+          usuario: user.uid
         });
       }
-      
-      // 4. Resetar estado local
-      currentMeasurementState = null;
-      
-      // 5. Reativar interface
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('resetBtn').disabled = true;
-      document.getElementById('measurementStatus').classList.add('hidden');
-      document.getElementById('resultDisplay').classList.add('hidden');
+    });
+  }
+  
+  // 3. Resetar estado local
+  currentMeasurementState = null;
+  
+  // 4. Reativar interface
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('resetBtn').disabled = true;
+  document.getElementById('measurementStatus').classList.add('hidden');
+  document.getElementById('resultDisplay').classList.add('hidden');
+  
+  // 5. Parar temporizador visual
+  stopVisualTimer();
+  document.getElementById('timerDisplay').textContent = "--:--";
+  
+  console.log("Medição reiniciada com sucesso");
+}
+    // Temporizador visual
+    function startVisualTimer() {
+	  
+     if (timerInterval) {
+        clearInterval(timerInterval);
+    } 	
+      startTime = new Date().getTime();
+      timerInterval = setInterval(updateTimerDisplay, 10);
+    }
+    
+    function stopVisualTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+    }
+    
+    function updateTimerDisplay() {
+      const currentTime = new Date().getTime();
+      const elapsed = (currentTime - startTime) / 1000;
+      document.getElementById('timerDisplay').textContent = elapsed.toFixed(3);
     }
 
     // Atualizar status do dispositivo na UI
@@ -695,170 +583,169 @@
     }
 
     // Carregar histórico de resultados
-    function loadResultsHistory() {
-      resultsRef = database.ref('users/' + user.uid + '/medicoes/forca');
-      
-      resultsListener = resultsRef.orderByChild('timestamp').on('value', (snapshot) => {
-        const results = snapshot.val() || {};
-        const resultsList = document.getElementById('resultsList');
-        const resultsCount = document.getElementById('resultsCount');
-        
-        resultsCount.textContent = Object.keys(results).length;
-        
-        if (Object.keys(results).length === 0) {
-          resultsList.innerHTML = '<p class="text-gray-500 text-center py-8">Nenhuma medição realizada ainda.</p>';
-          // Limpar gráfico se não houver dados
-          if (forceChart) {
-            forceChart.destroy();
-            forceChart = null;
-          }
-          return;
-        }
-        
-        // Ordenar resultados por timestamp (mais recente primeiro)
-        const sortedResults = Object.entries(results)
-          .map(([key, value]) => ({ key, ...value }))
-          .sort((a, b) => b.timestamp - a.timestamp);
-        
-        // Limpar e preencher lista
-        resultsList.innerHTML = '';
-        
-        sortedResults.forEach(result => {
-          const resultElement = document.createElement('div');
-          resultElement.className = 'result-item p-4 border-b border-gray-200 flex justify-between items-center';
-          
-          const date = new Date(result.timestamp);
-          const formattedDate = date.toLocaleString('pt-BR');
-          
-          resultElement.innerHTML = `
-            <div>
-              <p class="font-semibold">${result.valor.toFixed(1)} kgf</p>
-              <p class="text-sm text-gray-500">${formattedDate}</p>
-              ${result.dispositivo ? `<p class="text-sm text-gray-500">Dispositivo: ${result.dispositivo}</p>` : ''}
-            </div>
-            <button onclick="deleteResult('${result.key}')" class="text-red-600 hover:text-red-800">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-              </svg>
-            </button>
-          `;
-          
-          resultsList.appendChild(resultElement);
-        });
-        
-        // Atualizar gráfico com os resultados
-        updateForceChart(results);
-      });
-    }
-
-    function updateForceChart(results) {
-      const ctx = document.getElementById('forceChart').getContext('2d');
-      
-      // Converter resultados para array e ordenar por timestamp
-      const resultsArray = Object.entries(results)
-        .map(([key, value]) => ({ key, ...value }))
-        .sort((a, b) => a.timestamp - b.timestamp);
-      
-      // Preparar dados para o gráfico
-      const labels = resultsArray.map(result => {
-        const date = new Date(result.timestamp);
-        return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
-      });
-      
-      const data = resultsArray.map(result => result.valor);
-      
-      // Destruir gráfico anterior se existir
-      if (forceChart) {
-        forceChart.destroy();
+   function loadResultsHistory() {
+  resultsRef = database.ref('users/' + user.uid + '/medicoes/tempo_reacao');
+  
+  resultsListener = resultsRef.orderByChild('timestamp').on('value', (snapshot) => {
+    const results = snapshot.val() || {};
+    const resultsList = document.getElementById('resultsList');
+    const resultsCount = document.getElementById('resultsCount');
+    
+    resultsCount.textContent = Object.keys(results).length;
+    
+    if (Object.keys(results).length === 0) {
+      resultsList.innerHTML = '<p class="text-gray-500 text-center py-8">Nenhuma medição realizada ainda.</p>';
+      // Limpar gráfico se não houver dados
+      if (reactionTimeChart) {
+        reactionTimeChart.destroy();
+        reactionTimeChart = null;
       }
+      return;
+    }
+    
+    // Ordenar resultados por timestamp (mais recente primeiro)
+    const sortedResults = Object.entries(results)
+      .map(([key, value]) => ({ key, ...value }))
+      .sort((a, b) => b.timestamp - a.timestamp);
+    
+    // Limpar e preencher lista
+    resultsList.innerHTML = '';
+    
+    sortedResults.forEach(result => {
+      const resultElement = document.createElement('div');
+      resultElement.className = 'result-item p-4 border-b border-gray-200 flex justify-between items-center';
       
-      // Criar novo gráfico
-      forceChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Força (kgf)',
-            data: data,
-            borderColor: 'rgb(239, 68, 68)',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            tension: 0.1,
-            fill: true,
-            pointBackgroundColor: 'rgb(239, 68, 68)',
-            pointRadius: 4,
-            pointHoverRadius: 6
-          }]
+      const date = new Date(result.timestamp);
+      const formattedDate = date.toLocaleString('pt-BR');
+      
+      resultElement.innerHTML = `
+        <div>
+          <p class="font-semibold">${result.valor.toFixed(3)} segundos</p>
+          <p class="text-sm text-gray-500">${formattedDate}</p>
+          ${result.dispositivo ? `<p class="text-sm text-gray-500">Dispositivo: ${result.dispositivo}</p>` : ''}
+        </div>
+        <button onclick="deleteResult('${result.key}')" class="text-red-600 hover:text-red-800">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          </svg>
+        </button>
+      `;
+      
+      resultsList.appendChild(resultElement);
+    });
+    
+    // Atualizar gráfico com os resultados
+    updateReactionTimeChart(results);
+  });
+}
+
+function updateReactionTimeChart(results) {
+  const ctx = document.getElementById('reactionTimeChart').getContext('2d');
+  
+  // Converter resultados para array e ordenar por timestamp
+  const resultsArray = Object.entries(results)
+    .map(([key, value]) => ({ key, ...value }))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  
+  // Preparar dados para o gráfico
+  const labels = resultsArray.map(result => {
+    const date = new Date(result.timestamp);
+    return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});
+  });
+  
+  const data = resultsArray.map(result => result.valor);
+  
+  // Destruir gráfico anterior se existir
+  if (reactionTimeChart) {
+    reactionTimeChart.destroy();
+  }
+  
+  // Criar novo gráfico
+  reactionTimeChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Tempo de Reação (s)',
+        data: data,
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+        tension: 0.1,
+        fill: true,
+        pointBackgroundColor: 'rgb(75, 192, 192)',
+        pointRadius: 4,
+        pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Tempo (segundos)'
+          }
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: {
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: 'Força (kgf)'
-              }
-            },
-            x: {
-              ticks: {
-                maxRotation: 45,
-                minRotation: 45
-              }
-            }
-          },
-          plugins: {
-            title: {
-              display: true,
-              text: 'Evolução da Força Aplicada'
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  return `Força: ${context.parsed.y.toFixed(1)} kgf`;
-                }
-              }
+        x: {
+          ticks: {
+            maxRotation: 45,
+            minRotation: 45
+          }
+        }
+      },
+      plugins: {
+        title: {
+          display: true,
+          text: 'Evolução dos Tempos de Reação'
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return `Tempo: ${context.parsed.y.toFixed(3)}s`;
             }
           }
         }
-      });
-    }
-
-    // Excluir resultado individual
-    function deleteResult(resultKey) {
-      if (confirm('Tem certeza que deseja excluir este resultado?')) {
-        database.ref('users/' + user.uid + '/medicoes/forca/' + resultKey).remove()
-          .then(() => {
-            console.log("Resultado excluído");
-            // O gráfico será atualizado automaticamente pelo listener
-          })
-          .catch(error => {
-            console.error("Erro ao excluir resultado:", error);
-            showMessage("Erro ao excluir resultado.", true);
-          });
       }
     }
+  });
+}
+    // Excluir resultado individual
+  function deleteResult(resultKey) {
+  if (confirm('Tem certeza que deseja excluir este resultado?')) {
+    database.ref('users/' + user.uid + '/medicoes/tempo_reacao/' + resultKey).remove()
+      .then(() => {
+        console.log("Resultado excluído");
+        // O gráfico será atualizado automaticamente pelo listener
+      })
+      .catch(error => {
+        console.error("Erro ao excluir resultado:", error);
+        showMessage("Erro ao excluir resultado.", true);
+      });
+  }
+}
 
     // Limpar todos os resultados
-    function clearAllResults() {
-      if (confirm('Tem certeza que deseja excluir todos os resultados? Esta ação não pode ser desfeita.')) {
-        database.ref('users/' + user.uid + '/medicoes/forca').remove()
-          .then(() => {
-            console.log("Todos os resultados foram excluídos");
-            showMessage("Todos os resultados foram excluídos.", false);
-            
-            // Limpar gráfico
-            if (forceChart) {
-              forceChart.destroy();
-              forceChart = null;
-            }
-          })
-          .catch(error => {
-            console.error("Erro ao excluir resultados:", error);
-            showMessage("Erro ao excluir resultados.", true);
-          });
-      }
-    }
+ function clearAllResults() {
+  if (confirm('Tem certeza que deseja excluir todos os resultados? Esta ação não pode ser desfeita.')) {
+    database.ref('users/' + user.uid + '/medicoes/tempo_reacao').remove()
+      .then(() => {
+        console.log("Todos os resultados foram excluídos");
+        showMessage("Todos os resultados foram excluídos.", false);
+        
+        // Limpar gráfico
+        if (reactionTimeChart) {
+          reactionTimeChart.destroy();
+          reactionTimeChart = null;
+        }
+      })
+      .catch(error => {
+        console.error("Erro ao excluir resultados:", error);
+        showMessage("Erro ao excluir resultados.", true);
+      });
+  }
+}
 
     // Função para exibir mensagens
     function showMessage(text, isError = false) {
@@ -901,12 +788,6 @@
       if (verifyConnectionInterval) {
         clearInterval(verifyConnectionInterval);
         verifyConnectionInterval = null;
-      }
-      
-      // Parar contador regressivo se estiver ativo
-      if (countdownInterval) {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
       }
       
       // Remover listeners

@@ -1,4 +1,4 @@
-Tutorial Simplificado: Hospedar Site no Firebase
+# Tutorial Simplificado: Hospedar Site no Firebase
 
 Este guia vai te ajudar a publicar seu site de monitoramento de sensores no Firebase.
 Você já tem o arquivo index.html pronto - vamos apenas configurar e publicar.
