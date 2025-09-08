@@ -12,7 +12,7 @@
  #define PINO_LED 15
  #define ENDERECO_MPU6500 0x68
  
- uint32_t tempoPisca = 500;
+ uint32_t tempoPisca = 1500;
  
  enum class Estado {
    Inicial,
@@ -57,8 +57,7 @@
   * @brief Tarefa que serve para indicar em que estado o programa se encontra.
   */
  void tarefaDataHora(void* arg) {
-  
-   while (1) {
+    while (1) {
       vTaskDelay(4000/ portTICK_PERIOD_MS);
       String dataHora = conexao.getTimeString();
       xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
@@ -70,79 +69,45 @@
   * @brief Tarefa para calibração dos sensores
   */
  void tarefaCalibra(void* arg) {
-   bool calibracaoAtiva = false;
-   int ultimoProgresso = -1;
-   
-   while (1) {
-     xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
-     Estado estadoLocal = estadoAtual;
-     xSemaphoreGive(xEstadoMutex);
-     
-     if (estadoLocal == Estado::Calibrar) {
-       if (!calibracaoAtiva) {
-         // Iniciar nova calibração
-         sensores.iniciarCalibracaoInterativa();
-         calibracaoAtiva = true;
-         ultimoProgresso = -1;
-         
-         // Enviar status inicial para Firebase
-         conexao.updatePrecisionStatus("executando");
-         conexao.sendCalibrationProgress(0, NUM_SENSORES);
-         
-         Serial.println("Calibração interativa iniciada");
-         xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-         setaDisplay.printlog("Calibração iniciada");
-         setaDisplay.print("CALIBRANDO");
-         xSemaphoreGive(xDisplayMutex);
-       }
-       
-       // Processar um passo da calibração
-       bool calibracaoCompleta = sensores.processarCalibracaoInterativa();
-       
-       // Enviar progresso para o Firebase se mudou
-       int progressoAtual = sensores.getProgressoCalibracao();
-       if (progressoAtual != ultimoProgresso) {
-         ultimoProgresso = progressoAtual;
-         conexao.sendCalibrationProgress(progressoAtual, NUM_SENSORES);
-         
-         // Atualizar display
-         xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-         setaDisplay.printlog("Calibrado: " + String(progressoAtual) + "/" + String(NUM_SENSORES));
-         xSemaphoreGive(xDisplayMutex);
-         
-         // Enviar quais sensores foram calibrados
-         for (int i = 0; i < NUM_SENSORES; i++) {
-           if (sensores.getSensorCalibrado(i) == 1) {
-             conexao.sendSensorCalibrated(i);
-           }
-         }
-       }
-       
-       if (calibracaoCompleta) {
-         // Calibração concluída
-         conexao.setMeasurementResult(0.0);
-         conexao.updateDevicemMdicoes("concluida");
-         conexao.updatePrecisionStatus("concluida");
-         
-         xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
-         estadoAtual = Estado::Inicial;
-         xSemaphoreGive(xEstadoMutex);
-         calibracaoAtiva = false;
-         
-         Serial.println("Calibração interativa concluída");
-         xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-         setaDisplay.printlog("Calibração concluída");
-         setaDisplay.print("PRONTO");
-         xSemaphoreGive(xDisplayMutex);
-       }
-     } else {
-       calibracaoAtiva = false;
-     }
-     
-     vTaskDelay(100 / portTICK_PERIOD_MS);
-   }
- }
- /**
+  
+ while (1) {
+    xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
+    Estado estadoLocal = estadoAtual;
+    xSemaphoreGive(xEstadoMutex);
+    
+    if (estadoLocal == Estado::Calibrar) {
+        // Obter o sensor específico a calibrar
+        int sensorParaCalibrar = conexao.getSensorCalibracao(); // Nova função
+        if (sensorParaCalibrar >= 1 && sensorParaCalibrar <= 9) {
+          xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
+          if (sensorParaCalibrar == 9) {
+            setaDisplay.seta("f");  // Centro
+          } else {
+            // Convertendo índice 1-8 para ângulo: 0°, 45°, 90°, etc.
+            setaDisplay.seta((sensorParaCalibrar - 1) * 45);
+          }
+          xSemaphoreGive(xDisplayMutex);
+          // Informar início da calibração
+          conexao.updateDeviceEx();  
+          // Calibrar sensor específico
+          bool sucesso = sensores.calibrarSensorIndividual(sensorParaCalibrar);
+          // Informar resultado
+          if (sucesso) {
+           // conexao.setSensorCalibrado(sensorParaCalibrar);
+            conexao.updateDevicemMdicoes("concluida");
+          } else {
+            conexao.updateDevicemMdicoes("erro");
+          }
+        }
+      }
+      vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
+ 
+  }
+
+
+
+  /**
  * @brief Tarefa para gerenciar a comunicação com Firebase - Versão Refatorada
  */
 void tarefaComunicacao(void* arg) {
@@ -208,23 +173,19 @@ void tarefaComunicacao(void* arg) {
           
           // Processar o tipo de medição uma única vez
           if (medicao.tipo == "forca") {
-            setaDisplay.printlog("Comando: " + medicao.tipo);
-            setaDisplay.print("MODO FORÇA");
+            setaDisplay.printazul("FORCA");
             estadoAtual = Estado::Forca;
           } 
           else if (medicao.tipo == "precisao") {
-            setaDisplay.printlog("Comando: " + medicao.tipo);
-            setaDisplay.print("MODO PRECISÃO");
+            setaDisplay.printazul("PRECISAO");
             estadoAtual = Estado::Precisao;
           } 
           else if (medicao.tipo == "tempo_reacao") {
-            setaDisplay.printlog("Comando: " + medicao.tipo);
-            setaDisplay.print("MODO AGILIDADE");
+            setaDisplay.printazul("AGILIDADE");
             estadoAtual = Estado::Agilidade;
           } 
           else if (medicao.tipo == "tCalibrar") {
-            setaDisplay.printlog("Comando: " + medicao.tipo);
-            setaDisplay.print("MODO CALIBRAÇÃO");
+            setaDisplay.printazul("CALIBRAR");
             estadoAtual = Estado::Calibrar;
           }
           
@@ -492,9 +453,9 @@ void tarefaComunicacao(void* arg) {
    setaDisplay.printlog("Sensores OK");
    
    // Calibrar sensores de toque
-   sensores.calibrarSensoresToque();
-   Serial.println("Sensores calibrados");
-   setaDisplay.printlog("Sensores calibrados");
+   //sensores.calibrarSensoresToque();
+   //Serial.println("Sensores calibrados");
+   //setaDisplay.printlog("Sensores calibrados");
    
    // Mostrar hora atual
    String dataHora = conexao.getTimeString();

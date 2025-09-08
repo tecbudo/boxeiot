@@ -15,8 +15,8 @@ class Sensores {
 public:
     Sensores();
     void iniciar();
-    void calibrarSensoresToque();
     void calibrarSensoresToqueAvancado();
+    bool calibrarSensorIndividual(int indiceSensor); 
     void calibracaoManual();
     float lerSensorToque(int indice);
     float calcularForca();

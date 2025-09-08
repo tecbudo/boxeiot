@@ -366,3 +366,14 @@ bool ConexaoManager::setMeasurementLed(int ledIndex) {
   return Firebase.RTDB.updateNode(&fbdo, path.c_str(), &update);
 }
 
+int ConexaoManager::getSensorCalibracao() {
+    String path = "/devices/" + deviceId + "/medicoes/sensor";
+    int sensorAtual = -1;
+
+    if (Firebase.RTDB.getInt(&fbdo, path.c_str())) {
+        sensorAtual = fbdo.intData();
+    } else {
+        Serial.printf("Erro ao acessar Firebase: %s\n", fbdo.errorReason().c_str());
+    }
+    return sensorAtual;
+}

@@ -39,8 +39,8 @@ void SetaDisplay::update() {
 }
 
 void SetaDisplay::atualizarAreaAmarela() {
-  // Limpa apenas a área amarela
-  display.fillRect(0, 0, SCREEN_WIDTH, YELLOW_AREA_HEIGHT, BLACK);
+  // Limpa apenas a área de texto, deixando espaço para o símbolo (16px à direita)
+  display.fillRect(0, 0, SCREEN_WIDTH - 16, YELLOW_AREA_HEIGHT, BLACK);
 }
 
 void SetaDisplay::atualizarAreaAzul() {
@@ -99,24 +99,40 @@ void SetaDisplay::printlog(String mensagem) {
   display.display();
 }
 
+
 void SetaDisplay::print(String mensagem) {
-  // Atualiza apenas a área amarela
+  // Atualiza apenas a área amarela (sem o canto do símbolo)
   atualizarAreaAmarela();
   display.setTextSize(1);
   display.setTextColor(WHITE);
-  
-  // Centraliza o texto na área amarela
+  display.setTextWrap(false); // Não deixa quebrar linha
+
+  // Calcula largura máxima permitida
+  int maxWidth = SCREEN_WIDTH - 16;
+
+  // Mede o texto
   int16_t x1, y1;
   uint16_t w, h;
   display.getTextBounds(mensagem, 0, 0, &x1, &y1, &w, &h);
-  
-  int x = (SCREEN_WIDTH - w) / 2;
+
+  // Se o texto for muito largo, corta e adiciona "..."
+  String textoFinal = mensagem;
+  while (w > maxWidth && textoFinal.length() > 0) {
+    textoFinal.remove(textoFinal.length() - 1);
+    display.getTextBounds(textoFinal + "...", 0, 0, &x1, &y1, &w, &h);
+  }
+  if (textoFinal != mensagem) {
+    textoFinal += "...";
+  }
+
+  int x = (maxWidth - w) / 2;
   int y = (YELLOW_AREA_HEIGHT - h) / 2;
-  
+
   display.setCursor(x, y);
-  display.println(mensagem);
+  display.println(textoFinal);
   display.display();
 }
+
 
 void SetaDisplay::printazul(String mensagem) {
   // Limpa apenas a área azul

@@ -88,6 +88,79 @@ void Sensores::iniciarCalibracaoInterativa() {
     Serial.println("Toque em cada sensor para calibração...");
 }
 
+bool Sensores::calibrarSensorIndividual(int indiceSensor) {
+  const int TOTAL_AMOSTRAS = 20;
+  const int NUM_MAIORES = 10;
+  const int TOUCH_THRESHOLD_PERCENT = 25;
+  
+  int amostras[TOTAL_AMOSTRAS];
+  int amostrasColetadas = 0;
+  int captureCount = 0;
+  int max_values[NUM_MAIORES] = {0};
+  
+  unsigned long inicio = millis();
+  const unsigned long TIMEOUT_MS = 30000; // 30 segundos de timeout
+  
+  while (amostrasColetadas < TOTAL_AMOSTRAS && (millis() - inicio) < TIMEOUT_MS) {
+    int current_value = touchRead(pinosToque[indiceSensor]);
+    amostras[amostrasColetadas] = current_value;
+    amostrasColetadas++;
+    
+    int diferenca = abs(current_value - baselineToque[indiceSensor]);
+    int threshold = (baselineToque[indiceSensor] * TOUCH_THRESHOLD_PERCENT) / 100;
+    
+    if (diferenca > threshold) {
+      // Adicionar aos valores máximos se for maior que o menor valor atual
+      if (captureCount < NUM_MAIORES) {
+        max_values[captureCount] = current_value;
+        captureCount++;
+      } else {
+        // Encontrar o menor valor no array
+        int min_index = 0;
+        for (int i = 1; i < NUM_MAIORES; i++) {
+          if (max_values[i] < max_values[min_index]) {
+            min_index = i;
+          }
+        }
+        
+        // Substituir se o valor atual for maior
+        if (current_value > max_values[min_index]) {
+          max_values[min_index] = current_value;
+        }
+      }
+    }
+    
+    delay(100); // Pequena pausa entre amostras
+  }
+  
+  // Verificar se capturamos toques suficientes
+  if (captureCount < NUM_MAIORES) {
+    Serial.printf("Erro: Apenas %d toques válidos capturados para o sensor %d\n", 
+                  captureCount, indiceSensor);
+    return false;
+  }
+  
+  // Ordenar os valores máximos
+  std::sort(max_values, max_values + NUM_MAIORES);
+  
+  // Calcular a média dos 10 maiores valores
+  long soma = 0;
+  for (int i = 0; i < NUM_MAIORES; i++) {
+    soma += max_values[i];
+  }
+  int media = soma / NUM_MAIORES;
+  
+  // Definir o threshold
+  thresholdsToque[indiceSensor] = (baselineToque[indiceSensor] + media) / 2;
+  
+  Serial.printf("Sensor %d calibrado. Threshold: %d\n", 
+                indiceSensor, thresholdsToque[indiceSensor]);
+  
+  return true;
+}
+
+
+
 bool Sensores::processarCalibracaoInterativa() {
     if (!calibracaoInterativaAtiva) {
         return false;
@@ -206,23 +279,6 @@ void Sensores::calibrarSensoresToqueAvancado() {
     capturarToquesCalibracao();
     calcularThresholds();
     Serial.println("Calibração avançada concluída!");
-}
-
-void Sensores::calibrarSensoresToque() {
-    for (int i = 0; i < NUM_SENSORES; i++) {
-        uint32_t tempoInicial = millis();
-        uint32_t numAmostras = 0;
-        unsigned long somaToque = 0;
-
-        while (millis() - tempoInicial < DURACAO_CALIBRACAO_MS) {
-            somaToque += touchRead(pinosToque[i]);
-            numAmostras++;
-            delay(50);
-        }
-        
-        mediasToque[i] = (float)somaToque / numAmostras;
-        Serial.printf("Sensor %s: Média = %.2f\n", nomesSensores[i].c_str(), mediasToque[i]);
-    }
 }
 
 int Sensores::detectarToque() {

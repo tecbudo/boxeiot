@@ -331,7 +331,7 @@
             qrElement.innerHTML = '';
             
             // Gerar o QR Code
-            const qr = qrcode(0, 'M');
+            const qr = qrcode(0, 'H');  //troquei de M para H
             qr.addData(text);
             qr.make();
             

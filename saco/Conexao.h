@@ -59,6 +59,7 @@ public:
   bool sendSensorCalibrated(int sensorIndex);
   bool setMeasurementLed(int ledIndex);
   Medicao getCurrentMeasurement();
+  int getSensorCalibracao();
 
   FirebaseData fbdo;
   FirebaseAuth auth;
