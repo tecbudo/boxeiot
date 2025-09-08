@@ -68,43 +68,53 @@
  /**
   * @brief Tarefa para calibração dos sensores
   */
- void tarefaCalibra(void* arg) {
-  
- while (1) {
-    xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
-    Estado estadoLocal = estadoAtual;
-    xSemaphoreGive(xEstadoMutex);
+void tarefaCalibra(void* arg) {
+    int ultimoSensor = -1;
     
-    if (estadoLocal == Estado::Calibrar) {
-        // Obter o sensor específico a calibrar
-        int sensorParaCalibrar = conexao.getSensorCalibracao(); // Nova função
-        if (sensorParaCalibrar >= 1 && sensorParaCalibrar <= 9) {
-          xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-          if (sensorParaCalibrar == 9) {
-            setaDisplay.seta("f");  // Centro
-          } else {
-            // Convertendo índice 1-8 para ângulo: 0°, 45°, 90°, etc.
-            setaDisplay.seta((sensorParaCalibrar - 1) * 45);
-          }
-          xSemaphoreGive(xDisplayMutex);
-          // Informar início da calibração
-          conexao.updateDeviceEx();  
-          // Calibrar sensor específico
-          bool sucesso = sensores.calibrarSensorIndividual(sensorParaCalibrar);
-          // Informar resultado
-          if (sucesso) {
-           // conexao.setSensorCalibrado(sensorParaCalibrar);
-            conexao.updateDevicemMdicoes("concluida");
-          } else {
-            conexao.updateDevicemMdicoes("erro");
-          }
+    while (1) {
+        xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
+        Estado estadoLocal = estadoAtual;
+        xSemaphoreGive(xEstadoMutex);
+        
+        if (estadoLocal == Estado::Calibrar) {
+            // Obter o sensor específico a calibrar
+            int sensorParaCalibrar = conexao.getSensorCalibracao();
+            
+            if (sensorParaCalibrar >= 1 && sensorParaCalibrar <= 9) {
+                // Sensor mudou? Atualizar display
+                if (sensorParaCalibrar != ultimoSensor) {
+                    xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
+                    if (sensorParaCalibrar == 9) {
+                        setaDisplay.seta("f");  // Centro
+                    } else {
+                        setaDisplay.seta((sensorParaCalibrar - 1) * 45);
+                    }
+                    xSemaphoreGive(xDisplayMutex);
+                    ultimoSensor = sensorParaCalibrar;
+                }
+                
+                // Informar início da calibração
+                conexao.updateDeviceEx();  
+                
+                // Calibrar sensor específico (convertendo 1-9 para 0-8)
+                bool sucesso = sensores.calibrarSensorIndividual(sensorParaCalibrar - 1);
+                
+                // Informar resultado
+                if (sucesso) {
+                    conexao.updateDevicemMdicoes("concluida");
+                    // Marcar sensor como calibrado
+                    conexao.sendSensorCalibrated(sensorParaCalibrar);
+                } else {
+                    conexao.updateDevicemMdicoes("erro");
+                }
+            }
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+        } else {
+            ultimoSensor = -1; // Reset quando sair do modo calibração
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
         }
-      }
-      vTaskDelay(500 / portTICK_PERIOD_MS);
     }
- 
-  }
-
+}
 
 
   /**
@@ -478,7 +488,7 @@ void tarefaComunicacao(void* arg) {
    xTaskCreate(tarefaAgilidade, "tarefaAgilidade", 4096, NULL, 1, NULL);
    xTaskCreate(tarefaPrecisao, "tarefaPrecisao", 8192, NULL, 1, NULL);
    xTaskCreate(tarefaForca, "tarefaForca", 4096, NULL, 1, NULL);
-   xTaskCreate(tarefaCalibra, "tarefaCalibra", 4096, NULL, 1, NULL);
+   xTaskCreate(tarefaCalibra, "tarefaCalibra", 8192, NULL, 1, NULL);
    xTaskCreate(tarefaDataHora, "tarefaDataHora", 4096, NULL, 1, NULL);  
    Serial.println("Todas as tarefas iniciadas");
    setaDisplay.printlog("Sistema pronto");

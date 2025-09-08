@@ -211,14 +211,24 @@ bool ConexaoManager::updateDevicemMdicoes(const String status) {
 }
 
 bool ConexaoManager::updateDeviceEx() {
-  if (!isConnected()) return false;
-  
-  String path = "/devices/" + deviceId + "/medicoes";
-  FirebaseJson update;
-  update.set("estado", "executando");
-  update.set("timestampInicio", getTimestamp());
-  
-  return Firebase.RTDB.updateNode(&fbdo, path.c_str(), &update);
+    if (!isConnected()) return false;
+    
+    String path = "/devices/" + deviceId + "/medicoes";
+    FirebaseJson update;
+    update.set("estado", "executando");
+    update.set("timestampInicio", getTimestamp());
+    update.set("tipo", currentMeasurement.tipo);
+    update.set("usuario", currentMeasurement.usuario);
+    
+    // Inicializar campos de calibração se for o caso
+    if (currentMeasurement.tipo == "tCalibrar") {
+        update.set("sensor", 1); // Começar com o sensor 1
+        update.set("progresso/completos", 0);
+        update.set("progresso/total", 9);
+        update.set("progresso/percentual", 0);
+    }
+    
+    return Firebase.RTDB.updateNode(&fbdo, path.c_str(), &update);
 }
 
 bool ConexaoManager::setMeasurementResult(float value) {
@@ -372,8 +382,29 @@ int ConexaoManager::getSensorCalibracao() {
 
     if (Firebase.RTDB.getInt(&fbdo, path.c_str())) {
         sensorAtual = fbdo.intData();
+        Serial.printf("Sensor para calibrar: %d\n", sensorAtual);
     } else {
         Serial.printf("Erro ao acessar Firebase: %s\n", fbdo.errorReason().c_str());
+        // Verificar se o nó existe
+        if (fbdo.errorReason() == "path not exist") {
+            Serial.println("Criando estrutura de calibração...");
+            // Criar a estrutura inicial se não existir
+            FirebaseJson medicoesJson;
+            medicoesJson.set("tipo", "tCalibrar");
+            medicoesJson.set("estado", "solicitada");
+            medicoesJson.set("usuario", "");
+            medicoesJson.set("sensor", 0);
+            medicoesJson.set("timestamp", getTimestamp());
+            
+            Firebase.RTDB.setJSON(&fbdo, ("/devices/" + deviceId + "/medicoes").c_str(), &medicoesJson);
+        }
     }
     return sensorAtual;
+}
+
+bool ConexaoManager::setSensorCalibracao(int sensor) {
+    if (!isConnected()) return false;
+    
+    String path = "/devices/" + deviceId + "/medicoes/sensor";
+    return Firebase.RTDB.setInt(&fbdo, path.c_str(), sensor);
 }

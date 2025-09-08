@@ -99,7 +99,6 @@ void SetaDisplay::printlog(String mensagem) {
   display.display();
 }
 
-
 void SetaDisplay::print(String mensagem) {
   // Atualiza apenas a área amarela (sem o canto do símbolo)
   atualizarAreaAmarela();
