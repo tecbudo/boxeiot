@@ -254,40 +254,35 @@ bool ConexaoManager::setCurrentLed(int ledIndex) {
   return Firebase.RTDB.setInt(&fbdo, path.c_str(), ledIndex);
 }
 
-bool ConexaoManager::sendPrecisionResult(bool acerto, unsigned long tempoResposta, int sensorTocado, int ledAlvo) {
-  if (!isConnected()) return false;
-  
-  String path = "/devices/" + deviceId + "/medicoes/ultimoResultado";
-  FirebaseJson resultado;
-  resultado.set("acerto", acerto);
-  resultado.set("tempoResposta", tempoResposta);
-  resultado.set("sensorTocado", sensorTocado);
-  resultado.set("ledAlvo", ledAlvo);
-  resultado.set("timestamp", getTimestamp());
-  resultado.set("usuario", currentMeasurement.usuario); // Incluir ID do usuário
-  
-  bool success = Firebase.RTDB.setJSON(&fbdo, path.c_str(), &resultado);
-  
-  // Limpar o LED atual após enviar o resultado
-  if (success) {
-    path = "/devices/" + deviceId + "/medicoes/ledIndex";
-    Firebase.RTDB.deleteNode(&fbdo, path.c_str());
-  }
-  
-  return success;
-}
 
-bool ConexaoManager::sendPrecisionFinalResult(int totalAcertos, int totalErros) {
-  if (!isConnected()) return false;
-  
-  String path = "/devices/" + deviceId + "/medicoes";
-  FirebaseJson resultado;
-  resultado.set("estado", "concluida");
-  resultado.set("totalAcertos", totalAcertos);
-  resultado.set("totalErros", totalErros);
-  resultado.set("timestampConclusao", getTimestamp());
-  
-  return Firebase.RTDB.updateNode(&fbdo, path.c_str(), &resultado);
+/**
+ * @brief Envia resultado completo do teste de precisão
+ * @param acerto true se foi acerto, false se erro
+ * @param tempoResposta Tempo de resposta em milissegundos
+ * @param sensorTocado Sensor que foi tocado (0-8)
+ * @param ledSorteado LED que estava aceso (1-9)
+ * @return true se enviado com sucesso, false caso contrário
+ */
+bool ConexaoManager::sendPrecisionResult(bool acerto, unsigned long tempoResposta, int sensorTocado, int ledSorteado) {
+    if (!isConnected()) return false;
+    
+    String path = "/devices/" + deviceId + "/medicoes";
+    FirebaseJson update;
+    
+    // Atualizar estado para concluído
+    update.set("estado", "concluida");
+    update.set("timestampConclusao", getTimestamp());
+    
+    // Adicionar resultado completo
+    FirebaseJson resultado;
+    resultado.set("acerto", acerto);
+    resultado.set("tempoResposta", tempoResposta);
+    resultado.set("sensorTocado", sensorTocado);
+    resultado.set("ledSorteado", ledSorteado);
+    
+    update.set("resultado", resultado);
+    
+    return Firebase.RTDB.updateNode(&fbdo, path.c_str(), &update);
 }
 
 bool ConexaoManager::updatePrecisionStatus(const String& status) {
@@ -431,33 +426,9 @@ int ConexaoManager::getLedPrecisao() {
     return ledAtual;
 }
 
-/**
- * @brief Envia resultado completo do teste de precisão
- * @param acerto true se foi acerto, false se erro
- * @param tempoResposta Tempo de resposta em milissegundos
- * @param sensorTocado Sensor que foi tocado (0-8)
- * @param ledSorteado LED que estava aceso (1-9)
- * @return true se enviado com sucesso, false caso contrário
- */
-bool ConexaoManager::sendPrecisionResult(bool acerto, unsigned long tempoResposta, 
-                                        int sensorTocado, int ledSorteado) {
-    if (!isConnected()) return false;
-    
-    String path = "/devices/" + deviceId + "/medicoes";
-    FirebaseJson update;
-    
-    // Atualizar estado para concluído
-    update.set("estado", "concluida");
-    update.set("timestampConclusao", getTimestamp());
-    
-    // Adicionar resultado completo
-    FirebaseJson resultado;
-    resultado.set("acerto", acerto);
-    resultado.set("tempoResposta", tempoResposta);
-    resultado.set("sensorTocado", sensorTocado);
-    resultado.set("ledSorteado", ledSorteado);
-    
-    update.set("resultado", resultado);
-    
-    return Firebase.RTDB.updateNode(&fbdo, path.c_str(), &update);
+bool ConexaoManager::sendForceUpdate(float forca) {
+  if (!isConnected()) return false;
+  
+  String path = "/devices/" + deviceId + "/medicoes/forca";
+  return Firebase.RTDB.setFloat(&fbdo, path.c_str(), forca);
 }

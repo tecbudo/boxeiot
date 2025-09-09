@@ -61,9 +61,7 @@ public:
   Medicao getCurrentMeasurement();
   int getSensorCalibracao();
   bool setSensorCalibracao(int sensor);
-  int getLedPrecisao() 
-  bool sendPrecisionResult(bool acerto, unsigned long tempoResposta, 
-                                        int sensorTocado, int ledSorteado) 
+  int getLedPrecisao();
   FirebaseData fbdo;
   FirebaseAuth auth;
   FirebaseConfig config;
@@ -72,7 +70,7 @@ public:
   String getDeviceState();
   String deviceId;
   String generateDeviceId();
-  
+  bool sendForceUpdate(float forca);
   
 private:
   WiFiManager wifiManager;

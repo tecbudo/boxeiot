@@ -341,7 +341,7 @@ void tarefaPrecisao(void* arg) {
  /**
   * @brief Tarefa que estuda a força do soco
   */
- void tarefaForca(void* arg) {
+void tarefaForca(void* arg) {
    while (1) {
      xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
      Estado estadoLocal = estadoAtual;
@@ -349,7 +349,7 @@ void tarefaPrecisao(void* arg) {
      
      if (estadoLocal == Estado::Forca) {
        xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-       setaDisplay.printazul("MEDINDO FORÇA");
+       setaDisplay.printazul("BATA");
        xSemaphoreGive(xDisplayMutex);
        
        float forca = sensores.calcularForca();

@@ -243,9 +243,12 @@ sequenceDiagram
         D->>F: Atualiza valor de força em tempo real
         D->>F: Registra força máxima ao final
     else Modo Calibração
+        A->>F: Define estrutura inicial de calibração
+        F->>D: Notifica estado de calibração
+        D->>F: Cria estrutura se não existir
         A->>F: Define sensor atual (1-9)
         F->>D: Notifica sensor a calibrar
-        D->>D: Calibra sensor específico
+        D->>D: Calibra sensor específico (convertendo 1-9 para 0-8)
         D->>F: Atualiza estado e progresso
         F->>A: Notifica conclusão
         A->>F: Define próximo sensor (2-9)
@@ -257,7 +260,7 @@ sequenceDiagram
     
     F->>A: Notifica resultado final
     A->>U: Exibe resultado e atualiza histórico
-    A->>F: Salva resultado no histórico do usuário
+    A->>F: Salva resultado no histórico do usuario
 ```
 
 ### Diagrama de Estados - Dispositivo IoT
@@ -399,14 +402,16 @@ const firebaseConfig = {
 
 #### 3. Estrutura de Dados Incompleta
 - Adicionada estrutura completa em `medicoes` para suportar o processo de calibração
+- Implementada criação automática da estrutura quando não existir
 
 #### 4. Comunicação Unidirecional
 - Implementada comunicação bidirecional com o firmware escrevendo na estrutura do Firebase
+- Adicionada capacidade do firmware criar a estrutura de dados inicial se necessário
 
 ### Novas Funções Implementadas
 
 #### No Firmware (Conexao.cpp):
-1. **`getSensorCalibracao()`**: Obtém o sensor atual a ser calibrado do Firebase
+1. **`getSensorCalibracao()`**: Obtém o sensor atual a ser calibrado do Firebase, criando a estrutura se necessário
 2. **`setSensorCalibracao(int sensor)`**: Define o sensor atual a ser calibrado no Firebase
 3. **`updateDeviceEx()`**: Inicializa todos os campos necessários para a calibração
 4. **`sendSensorCalibrated(int sensor)`**: Notifica que um sensor foi calibrado com sucesso
@@ -415,7 +420,7 @@ const firebaseConfig = {
 1. Interface web inicia calibração e define a estrutura de dados
 2. Firmware detecta comando e entra no estado de calibração
 3. Interface web define sequencialmente os sensores a calibrar (1-9)
-4. Firmware calibra cada sensor e atualiza o progresso
+4. Firmware calibra cada sensor (convertendo 1-9 para 0-8) e atualiza o progresso
 5. Interface web monitora progresso e define próximo sensor
 6. Ao final, interface web define estado como "completo"
 
@@ -425,5 +430,25 @@ const firebaseConfig = {
 2. **Robustez**: Menos pontos de falha na comunicação com timeouts e tratamento de erros
 3. **Manutenibilidade**: Código mais fácil de entender e modificar
 4. **Experiência do Usuário**: Feedback visual claro sobre o andamento da calibração
+5. **Resiliência**: Sistema cria automaticamente estrutura de dados se não existir
+
+### Detalhes Técnicos das Melhorias
+
+#### Modificação na Função `getSensorCalibracao()`
+- Adicionada verificação de erro para o caso de caminho não existir
+- Implementada criação da estrutura inicial se o caminho não existir
+
+#### Nova Função `setSensorCalibracao()`
+- Permite ao firmware definir o sensor atual a ser calibrado
+- Facilita a comunicação bidirecional
+
+#### Atualização da Tarefa de Calibração
+- Verificação contínua do sensor atual a ser calibrado
+- Atualização do display quando o sensor muda
+- Conversão automática de índices (1-9 para 0-8)
+
+#### Melhoria na Função `updateDeviceEx()`
+- Inicialização completa de todos os campos necessários para calibração
+- Definição de valores padrão para progresso e percentual
 
 Esta documentação cobre todos os aspectos principais do sistema BoxeIoT, incluindo as recentes melhorias na sincronização entre a interface web e o firmware. Para informações mais detalhadas sobre implementação específica, consulte os comentários no código-fonte de cada página.
