@@ -270,121 +270,72 @@ void tarefaComunicacao(void* arg) {
  }
  
  /**
-  * @brief Tarefa que estuda a precisão dos golpes - Versão Melhorada
-  */
- void tarefaPrecisao(void* arg) {
-  static int totalAcertos = 0;
-  static int totalErros = 0;
-  
-  while (1) {
-    xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
-    Estado estadoLocal = estadoAtual;
-    xSemaphoreGive(xEstadoMutex);
+ * @brief Tarefa para teste de precisão - Versão Simplificada
+ * Agora a interface web controla a sequência de LEDs
+ */
+void tarefaPrecisao(void* arg) {
+    int ultimoLed = -1;
+    unsigned long tempoInicio = 0;
     
-    if (estadoLocal == Estado::Precisao) {
-      // Gera um LED entre 1 e 9 (compatível com a página web)
-      int ledSorteado = random(1, 10);
-      
-      // Usar display para mostrar a seta correspondente
-      xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-      setaDisplay.printazul("PRECISÃO");
-      xSemaphoreGive(xDisplayMutex);
-      
-      vTaskDelay(500 / portTICK_PERIOD_MS);
-      
-      xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-      setaDisplay.printazul("prepare-se");
-      xSemaphoreGive(xDisplayMutex);
-      
-      vTaskDelay(500 / portTICK_PERIOD_MS);
-
-      xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-      if (ledSorteado == 9) {
-        setaDisplay.seta("f");  // Centro
-      } else {
-        // Convertendo índice 1-8 para ângulo: 0°, 45°, 90°, etc.
-        setaDisplay.seta((ledSorteado - 1) * 45);
-      }
-      xSemaphoreGive(xDisplayMutex);
-      
-      // Enviar informação do LED sorteado para Firebase
-      conexao.setCurrentLed(ledSorteado);
-      
-      int sensorTocado = -1;
-      unsigned long tempoInicio = millis();
-      const unsigned long timeoutMs = 30000; // Timeout de 30 segundos
-      
-      while (sensorTocado < 0 && (millis() - tempoInicio) < timeoutMs) {
-        sensorTocado = sensores.detectarToque();
-        
-        // Verificar se há comando de parada
-        if (conexao.checkForStopCommand()) {
-          break;
-        }
-        
-        // Verificar se ainda está no modo precisão
+    while (1) {
         xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
-        bool aindaNoModo = (estadoAtual == Estado::Precisao);
+        Estado estadoLocal = estadoAtual;
         xSemaphoreGive(xEstadoMutex);
         
-        if (!aindaNoModo) {
-          break;
-        }
-        
-        vTaskDelay(10 / portTICK_PERIOD_MS);
-      }
-      
-      if (sensorTocado >= 0) {
-        // O sensor tocado é indexado de 0 a 8, mas o LED é de 1 a 9
-        bool acerto = (sensorTocado == (ledSorteado - 1));
-        unsigned long tempoResposta = millis() - tempoInicio;
-        
-        // Atualizar contadores
-        if (acerto) {
-          totalAcertos++;
-          Serial.print("Acerto! Total: ");
-          Serial.println(totalAcertos);
-          xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-          setaDisplay.printlog("Acerto! " + String(totalAcertos));
-          setaDisplay.printazul("ACERTOU!");
-          xSemaphoreGive(xDisplayMutex);
+        if (estadoLocal == Estado::Precisao) {
+            // Obter o LED específico a ser acionado
+            int ledParaAcender = conexao.getLedPrecisao();
+            
+            if (ledParaAcender >= 1 && ledParaAcender <= 9) {
+                // LED mudou? Atualizar display
+                if (ledParaAcender != ultimoLed) {
+                    xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
+                    if (ledParaAcender == 9) {
+                        setaDisplay.seta("f");  // Centro
+                    } else {
+                        setaDisplay.seta((ledParaAcender - 1) * 45);
+                    }
+                    setaDisplay.printazul("PRECISÃO");
+                    xSemaphoreGive(xDisplayMutex);
+                    ultimoLed = ledParaAcender;
+                    tempoInicio = millis();
+                }
+                
+                // Aguardar toque no sensor
+                int sensorTocado = sensores.detectarToque();
+                
+                if (sensorTocado >= 0) {
+                    // Calcular tempo de resposta
+                    unsigned long tempoResposta = millis() - tempoInicio;
+                    
+                    // Determinar se foi acerto (sensor indexado 0-8, LED 1-9)
+                    bool acerto = (sensorTocado == (ledParaAcender - 1));
+                    
+                    // Enviar resultado para Firebase
+                    conexao.sendPrecisionResult(acerto, tempoResposta, sensorTocado, ledParaAcender);
+                    
+                    // Feedback visual no display
+                    xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
+                    if (acerto) {
+                        setaDisplay.printazul("ACERTOU!");
+                    } else {
+                        setaDisplay.printazul("ERROU!");
+                    }
+                    xSemaphoreGive(xDisplayMutex);
+                    
+                    // Pequena pausa para feedback
+                    vTaskDelay(1000 / portTICK_PERIOD_MS);
+                    
+                    // Preparar para próximo LED
+                    ultimoLed = -1;
+                }
+            }
+            vTaskDelay(50 / portTICK_PERIOD_MS);
         } else {
-          totalErros++;
-          Serial.print("Erro! Total: ");
-          Serial.println(totalErros);
-          xSemaphoreTake(xDisplayMutex, portMAX_DELAY);
-          setaDisplay.printlog("Erro! " + String(totalErros));
-          setaDisplay.printazul("ERROU!");
-          xSemaphoreGive(xDisplayMutex);
+            ultimoLed = -1; // Reset quando sair do modo precisão
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
         }
-        
-        // Enviar resultado para Firebase
-        conexao.sendPrecisionResult(acerto, tempoResposta, sensorTocado, ledSorteado);
-        
-        // Pequena pausa para feedback visual
-        vTaskDelay(1500 / portTICK_PERIOD_MS);
-      }
-      
-      // Verificar se foi cancelado ou timeout
-      if (conexao.checkForStopCommand() || (millis() - tempoInicio) >= timeoutMs) {
-        // Enviar resultados finais
-        conexao.sendPrecisionFinalResult(totalAcertos, totalErros);
-        conexao.updateDevicemMdicoes("concluida");
-        
-        // Resetar contadores para a próxima sessão
-        totalAcertos = 0;
-        totalErros = 0;
-        
-        xSemaphoreTake(xEstadoMutex, portMAX_DELAY);
-        estadoAtual = Estado::Inicial;
-        xSemaphoreGive(xEstadoMutex);
-        
-        Serial.println("Sessão de precisão finalizada.");
-      }
     }
-    
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-  }
 }
  
  /**

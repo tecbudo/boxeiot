@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Teste de Precisão - BoxeIoT</title>
   <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="/styles.css" rel="stylesheet">
   <style>
     body {
       font-family: 'Inter', sans-serif;
@@ -94,7 +94,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
       transition: all 0.2s;
     }
     .led.active {
@@ -108,6 +107,42 @@
     .led.wrong {
       background-color: #3b82f6;
       box-shadow: 0 0 20px #3b82f6;
+    }
+    /* Novos estilos para estatísticas */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .stat-card {
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #1a2a6c;
+    }
+    .stat-label {
+      font-size: 0.875rem;
+      color: #64748b;
+    }
+    .sensor-number {
+      font-size: 24px;
+      font-weight: bold;
+    }
+    .sensor-arrow {
+      color: #4b5563;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sensor-arrow svg {
+      width: 24px;
+      height: 24px;
     }
   </style>
   <!-- Scripts do Firebase na ordem correta -->
@@ -149,9 +184,9 @@
           <!-- Os LEDs serão gerados via JavaScript -->
         </div>
         
-        <!-- Display de pontuação -->
+        <!-- Display de pontuação e estatísticas - MODIFICADO -->
         <div class="score-display" id="scoreDisplay">
-          <div class="grid grid-cols-3 gap-4">
+          <div class="grid grid-cols-3 gap-4 mb-4">
             <div class="text-center">
               <p class="text-sm text-gray-600">Acertos</p>
               <p id="hitsCount" class="text-3xl font-bold text-green-600">0</p>
@@ -163,6 +198,18 @@
             <div class="text-center">
               <p class="text-sm text-gray-600">Pontuação</p>
               <p id="totalScore" class="text-3xl font-bold text-blue-600">0</p>
+            </div>
+          </div>
+          
+          <!-- Novas estatísticas em tempo real -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value" id="avgReactionTime">0ms</div>
+              <div class="stat-label">Tempo Médio</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="accuracyRate">0%</div>
+              <div class="stat-label">Precisão</div>
             </div>
           </div>
         </div>
@@ -185,7 +232,7 @@
           <p id="statusMessage"></p>
         </div>
       </div>
-      
+
       <!-- Histórico de resultados -->
       <div class="card p-6">
         <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Histórico de Treinos</h2>
@@ -219,19 +266,6 @@
   </footer>
 
   <script>
-    // Variáveis para controle de estado
-    let isTrainingActive = false;
-    let currentSessionId = null;
-    let hits = 0;
-    let misses = 0;
-    let score = 0;
-    let trainingStartTime = null;
-    let trainingTimerInterval = null;
-    let currentMeasurementState = null;
-    let measurementTimeout = null;
-    let isRedirecting = false;
-    let scoreChart = null;
-    
     // Configuração do Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyBLsU5CMvKQOm9Qs9mu6X1K27fVI8WuBQg",
@@ -249,16 +283,88 @@
     const auth = firebase.auth();
     const database = firebase.database();
 
-    // Variáveis globais
+    // Variáveis globais MODIFICADAS
     let user = null;
     let deviceCode = null;
     let deviceRef = null;
-    let userDeviceRef = null;
+    let isTrainingActive = false;
+    let currentSessionId = null;
+    let hits = 0;
+    let misses = 0;
+    let score = 0;
+    let totalAttempts = 0;
+    let totalReactionTime = 0;
+    let trainingStartTime = null;
+    let trainingTimerInterval = null;
     let measurementRef = null;
     let measurementListener = null;
-    let resultsRef = null;
-    let resultsListener = null;
+    let currentLedIndex = 0;
+    let ledSequence = [];
+    let individualResults = [];
     let verifyConnectionInterval = null;
+    let isRedirecting = false;
+    let scoreChart = null;
+    
+    // Gerar SVG para a seta baseado no ângulo
+    function getArrowSVG(angle) {
+      if (angle === 'f') {
+        // Seta para frente (centro)
+        return `
+          <svg viewBox="0 0 24 24" width="24" height="24">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" fill="none" stroke-width="2"/>
+            <circle cx="12" cy="12" r="3" fill="currentColor"/>
+          </svg>
+        `;
+      } else {
+        // Seta direcional
+        return `
+          <svg viewBox="0 0 24 24" width="24" height="24" style="transform: rotate(${angle}deg);">
+            <path d="M12 2 L2 22 L22 22 Z" fill="currentColor" transform="translate(12,12) rotate(180) translate(-12,-12)"/>
+          </svg>
+        `;
+      }
+    }
+
+    // Criar grid de LEDs no padrão de calibração
+    function createLedGrid() {
+      const ledGrid = document.getElementById('ledGrid');
+      ledGrid.innerHTML = '';
+      
+      // Seguindo o mesmo padrão da calibração
+      const sensorData = [
+        { id: 4, angle: 135 },  // Diagonal superior esquerda
+        { id: 3, angle: 180 },   // Para cima
+        { id: 2, angle: 225 },   // Diagonal superior direita
+        { id: 5, angle: 90 },    // Para esquerda
+        { id: 9, angle: 'f' },   // Centro (frente)
+        { id: 1, angle: 270 },   // Para direita
+        { id: 6, angle: 45 },    // Diagonal inferior esquerda
+        { id: 7, angle: 0 },     // Para baixo
+        { id: 8, angle: 315 }    // Diagonal inferior direita
+      ];
+      
+      sensorData.forEach(sensor => {
+        const ledElement = document.createElement('div');
+        ledElement.className = 'led';
+        ledElement.id = `led-${sensor.id}`;
+        ledElement.dataset.sensorId = sensor.id;
+        ledElement.dataset.angle = sensor.angle;
+
+        // Número do sensor
+        const number = document.createElement('div');
+        number.className = 'sensor-number';
+        number.textContent = sensor.id;
+
+        // Seta direcional
+        const arrow = document.createElement('div');
+        arrow.className = 'sensor-arrow';
+        arrow.innerHTML = getArrowSVG(sensor.angle);
+
+        ledElement.appendChild(number);
+        ledElement.appendChild(arrow);
+        ledGrid.appendChild(ledElement);
+      });
+    }
 
     // Verificar autenticação
     firebase.auth().onAuthStateChanged((currentUser) => {
@@ -280,34 +386,19 @@
           return;
         }
         
+        // Criar grid de LEDs no padrão de calibração
+        createLedGrid();
+        
         // Inicializar conexão com o dispositivo
         connectToDeviceWithLock();
         
         // Carregar histórico de resultados
         loadResultsHistory();
         
-        // Criar grid de LEDs
-        createLedGrid();
-        
         // Iniciar verificação periódica de conexão
         verifyConnectionInterval = setInterval(verifyDeviceConnection, 10000);
       }
     });
-
-    // Criar grid de LEDs
-    function createLedGrid() {
-      const ledGrid = document.getElementById('ledGrid');
-      ledGrid.innerHTML = '';
-      
-      for (let i = 1; i <= 9; i++) {
-        const led = document.createElement('div');
-        led.className = 'led';
-        led.id = `led-${i}`;
-        led.dataset.index = i;
-        led.addEventListener('click', () => handleLedClick(i));
-        ledGrid.appendChild(led);
-      }
-    }
 
     // Conectar ao dispositivo com controle de acesso exclusivo
     function connectToDeviceWithLock() {
@@ -362,18 +453,12 @@
           const measurement = snapshot.val();
           if (measurement && measurement.usuario === user.uid) {
             processMeasurementUpdate(measurement);
-          } else {
-            // não há medição ativa
-            if (isTrainingActive && measurement && measurement.estado === "concluida") {
-              // Se o treino está ativo e recebemos uma conclusão, solicitar nova medição
-              setTimeout(() => solicitarMedicao(), 500);
-            }
           }
         });
         
         // Registrar usuário na lista de conexões
-        userDeviceRef = database.ref("devices/" + deviceCode + "/usuarios/" + user.uid);
-        userDeviceRef.set(firebase.database.ServerValue.TIMESTAMP)
+        database.ref("devices/" + deviceCode + "/usuarios/" + user.uid)
+          .set(firebase.database.ServerValue.TIMESTAMP)
           .then(() => {
             console.log("Usuário registrado no dispositivo");
           })
@@ -385,97 +470,132 @@
 
     // Processar atualização de medição
     function processMeasurementUpdate(measurement) {
-      if (measurementTimeout) {
-        clearTimeout(measurementTimeout);
-        measurementTimeout = null;
-      }
-      
-      currentMeasurementState = measurement.estado;
+      if (!isTrainingActive) return;
       
       switch(measurement.estado) {
-        case "solicitada":
-          updateMeasurementStatus("Medição solicitada. Aguardando dispositivo...", "info");
-          break;
         case "executando":
-          updateMeasurementStatus("LED aceso! Toque no LED correspondente.", "warning");
-          // Destacar o LED que foi aceso no dispositivo
-          highlightLed(measurement.ledIndex);
+          // Dispositivo começou a executar (LED aceso)
+          updateMeasurementStatus("LED " + measurement.ledIndex + " aceso! Toque agora.", "warning");
           break;
+          
         case "concluida":
-          if (measurement.valor !== undefined) {
-            processMeasurementResult(measurement.valor);
-            // Se o treino ainda está ativo, solicitar nova medição automaticamente
-            if (isTrainingActive) {
-              setTimeout(() => solicitarMedicao(), 1000);
-            } else {
-              // Limpar medição após processar
-              measurementRef.remove();
-            }
+          // Dispositivo completou a medição
+          if (measurement.resultado) {
+            processMeasurementResult(measurement);
+          }
+          
+          // Solicitar próximo LED após um breve delay
+          if (isTrainingActive) {
+            setTimeout(() => requestNextLed(), 1000);
           }
           break;
       }
     }
 
-    // Destacar o LED que foi aceso no dispositivo físico
+    // Processar resultado da medição
+    function processMeasurementResult(measurement) {
+      totalAttempts++;
+      
+      // Calcular se foi acerto (sensor tocado corresponde ao LED solicitado)
+      // Nota: No firmware, os sensores são indexados de 0-8, mas os LEDs de 1-9
+      const expectedSensor = measurement.ledIndex - 1;
+      const isHit = measurement.sensorTocado === expectedSensor;
+      
+      // Atualizar contadores
+      if (isHit) {
+        hits++;
+        document.getElementById('hitsCount').textContent = hits;
+      } else {
+        misses++;
+        document.getElementById('missesCount').textContent = misses;
+      }
+      
+      // Atualizar pontuação total
+      score = hits - misses;
+      document.getElementById('totalScore').textContent = score;
+      
+      // Armazenar resultado individual para estatísticas
+      individualResults.push({
+        ledSorteado: measurement.ledIndex,
+        sensorTocado: measurement.sensorTocado,
+        tempoResposta: measurement.tempoResposta,
+        acerto: isHit,
+        timestamp: measurement.timestamp
+      });
+      
+      // Atualizar tempo total de reação
+      totalReactionTime += measurement.tempoResposta;
+      
+      // Calcular e exibir estatísticas
+      const avgReactionTime = totalAttempts > 0 ? Math.round(totalReactionTime / totalAttempts) : 0;
+      const accuracyRate = totalAttempts > 0 ? Math.round((hits / totalAttempts) * 100) : 0;
+      
+      document.getElementById('avgReactionTime').textContent = avgReactionTime + 'ms';
+      document.getElementById('accuracyRate').textContent = accuracyRate + '%';
+      
+      // Feedback visual
+      const ledElement = document.getElementById(`led-${measurement.ledIndex}`);
+      if (ledElement) {
+        ledElement.classList.remove('active');
+        if (isHit) {
+          ledElement.classList.add('correct');
+          updateMeasurementStatus("Acerto! +1 ponto", "success");
+        } else {
+          ledElement.classList.add('wrong');
+          updateMeasurementStatus("Erro! O correto era " + measurement.ledIndex, "error");
+        }
+        
+        // Remover classes após breve período
+        setTimeout(() => {
+          ledElement.classList.remove('correct', 'wrong');
+        }, 1000);
+      }
+    }
+
+    // Destacar o LED na interface
     function highlightLed(ledIndex) {
       // Remover destaque de todos os LEDs
       document.querySelectorAll('.led').forEach(led => {
-        led.classList.remove('active', 'correct', 'wrong');
+        led.classList.remove('active');
       });
       
-      // Destacar o LED correspondente
+      // Destacar o LED atual
       const ledElement = document.getElementById(`led-${ledIndex}`);
       if (ledElement) {
         ledElement.classList.add('active');
       }
     }
 
-    // Processar resultado da medição
-    function processMeasurementResult(result) {
-      if (result === 1) {
-        // Acerto
-        hits++;
-        document.getElementById('hitsCount').textContent = hits;
-        updateMeasurementStatus("Acerto! +1 ponto", "success");
-        
-        // Feedback visual - LED verde
-        document.querySelectorAll('.led.active').forEach(led => {
-          led.classList.remove('active');
-          led.classList.add('correct');
-        });
-      } else if (result === -1) {
-        // Erro
-        misses++;
-        document.getElementById('missesCount').textContent = misses;
-        updateMeasurementStatus("Erro! -1 ponto", "error");
-        
-        // Feedback visual - LED azul
-        document.querySelectorAll('.led.active').forEach(led => {
-          led.classList.remove('active');
-          led.classList.add('wrong');
-        });
-      }
+    // Solicitar próximo LED
+    function requestNextLed() {
+      if (!isTrainingActive) return;
       
-      // Atualizar pontuação total
-      score = hits - misses;
-      document.getElementById('totalScore').textContent = score;
-    }
-
-    // Manipular clique em um LED
-    function handleLedClick(ledIndex) {
-      if (!isTrainingActive || currentMeasurementState !== "executando") {
-        return;
-      }
+      // Sortear próximo LED (1-9)
+      currentLedIndex = Math.floor(Math.random() * 9) + 1;
+      ledSequence.push(currentLedIndex);
       
-      // Enviar resposta para o dispositivo
-      const respostaRef = database.ref("devices/" + deviceCode + "/resposta");
-      respostaRef.set({
-        led: ledIndex,
+      // Destacar o LED na interface
+      highlightLed(currentLedIndex);
+      
+      // Enviar comando para o dispositivo
+      const measurementData = {
+        tipo: "precisao",
+        estado: "solicitada",
         usuario: user.uid,
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-      }).catch(error => {
-        console.error("Erro ao enviar resposta:", error);
-      });
+        ledIndex: currentLedIndex,
+        timestamp: firebase.database.ServerValue.TIMESTAMP,
+        sequencia: ledSequence
+      };
+      
+      measurementRef.set(measurementData)
+        .then(() => {
+          console.log("LED solicitado:", currentLedIndex);
+          updateMeasurementStatus("Acerte o LED " + currentLedIndex, "warning");
+        })
+        .catch(error => {
+          console.error("Erro ao solicitar LED:", error);
+          showMessage("Erro ao conectar com o dispositivo. Tente novamente.", true);
+        });
     }
 
     // Iniciar treino
@@ -498,13 +618,20 @@
           return;
         }
         
-        // Reiniciar contadores
+        // Reiniciar contadores e estatísticas
         hits = 0;
         misses = 0;
         score = 0;
+        totalAttempts = 0;
+        totalReactionTime = 0;
+        ledSequence = [];
+        individualResults = [];
+        
         document.getElementById('hitsCount').textContent = '0';
         document.getElementById('missesCount').textContent = '0';
         document.getElementById('totalScore').textContent = '0';
+        document.getElementById('avgReactionTime').textContent = '0ms';
+        document.getElementById('accuracyRate').textContent = '0%';
         
         // Iniciar temporizador de treino
         trainingStartTime = new Date().getTime();
@@ -519,7 +646,7 @@
         document.getElementById('stopBtn').disabled = false;
         
         // Solicitar primeira medição
-        solicitarMedicao();
+        requestNextLed();
       });
     }
 
@@ -572,53 +699,23 @@
       }
     }
 
-    // Solicitar medição
-    function solicitarMedicao() {
-      if (!isTrainingActive || !deviceCode) {
-        return;
-      }
-      
-      // Solicitar medição
-      const measurementData = {
-        tipo: "precisao",
-        estado: "solicitada",
-        usuario: user.uid,
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-      };
-      
-      measurementRef.set(measurementData)
-        .then(() => {
-          console.log("Medição de precisão solicitada");
-          measurementTimeout = setTimeout(() => {
-            if (currentMeasurementState === "solicitada") {
-              showMessage("Dispositivo não respondeu. Tente novamente.", true);
-              if (isTrainingActive) {
-                setTimeout(() => solicitarMedicao(), 2000);
-              }
-            }
-          }, 10000); // 10 segundos de timeout
-        })
-        .catch(error => {
-          console.error("Erro ao solicitar medição:", error);
-          showMessage("Erro ao conectar com o dispositivo. Verifique a conexão e tente novamente.", true);
-          if (isTrainingActive) {
-            setTimeout(() => solicitarMedicao(), 2000);
-          }
-        });
-    }
-
-    // Salvar sessão de treino
+    // Salvar sessão de treino com dados completos
     function saveTrainingSession() {
       if (!currentSessionId) return;
       
       const now = new Date().getTime();
       const duration = Math.floor((now - trainingStartTime) / 1000);
+      const avgReactionTime = totalAttempts > 0 ? Math.round(totalReactionTime / totalAttempts) : 0;
       
       const sessionData = {
         acertos: hits,
         erros: misses,
+        totalTentativas: totalAttempts,
         pontuacao: score,
         tempoTotal: duration,
+        tempoMedioReacao: avgReactionTime,
+        sequenciaLeds: ledSequence,
+        resultadosIndividuais: individualResults,
         timestampInicio: trainingStartTime,
         timestampFim: now,
         dispositivo: deviceCode
@@ -626,7 +723,7 @@
       
       database.ref('users/' + user.uid + '/treinos/precisao/' + currentSessionId).set(sessionData)
         .then(() => {
-          console.log("Sessão de treino salva");
+          console.log("Sessão de treino salva com dados completos");
         })
         .catch(error => {
           console.error("Erro ao salvar sessão de treino:", error);
@@ -722,9 +819,9 @@
 
     // Carregar histórico de resultados
     function loadResultsHistory() {
-      resultsRef = database.ref('users/' + user.uid + '/treinos/precisao');
+      const resultsRef = database.ref('users/' + user.uid + '/treinos/precisao');
       
-      resultsListener = resultsRef.orderByChild('timestampInicio').on('value', (snapshot) => {
+      resultsRef.orderByChild('timestampInicio').on('value', (snapshot) => {
         const results = snapshot.val() || {};
         const resultsList = document.getElementById('resultsList');
         const resultsCount = document.getElementById('resultsCount');
@@ -962,9 +1059,7 @@
       
       // Remover listeners
       if (deviceRef) deviceRef.off();
-      if (userDeviceRef) userDeviceRef.off();
       if (measurementListener) measurementRef.off('value', measurementListener);
-      if (resultsListener) resultsRef.off('value', resultsListener);
       
       // Liberar dispositivo
       if (deviceCode && user) {

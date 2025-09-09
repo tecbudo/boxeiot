@@ -61,7 +61,9 @@ public:
   Medicao getCurrentMeasurement();
   int getSensorCalibracao();
   bool setSensorCalibracao(int sensor);
-
+  int getLedPrecisao() 
+  bool sendPrecisionResult(bool acerto, unsigned long tempoResposta, 
+                                        int sensorTocado, int ledSorteado) 
   FirebaseData fbdo;
   FirebaseAuth auth;
   FirebaseConfig config;

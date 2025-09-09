@@ -228,6 +228,11 @@ bool ConexaoManager::updateDeviceEx() {
         update.set("progresso/percentual", 0);
     }
     
+    // Inicializar campo ledIndex para precisão
+    if (currentMeasurement.tipo == "precisao") {
+        update.set("ledIndex", 0); // Será definido pela interface web
+    }
+    
     return Firebase.RTDB.updateNode(&fbdo, path.c_str(), &update);
 }
 
@@ -407,4 +412,52 @@ bool ConexaoManager::setSensorCalibracao(int sensor) {
     
     String path = "/devices/" + deviceId + "/medicoes/sensor";
     return Firebase.RTDB.setInt(&fbdo, path.c_str(), sensor);
+}
+
+/**
+ * @brief Obtém o LED atual para teste de precisão
+ * @return Número do LED (1-9) ou -1 se não houver comando
+ */
+int ConexaoManager::getLedPrecisao() {
+    String path = "/devices/" + deviceId + "/medicoes/ledIndex";
+    int ledAtual = -1;
+
+    if (Firebase.RTDB.getInt(&fbdo, path.c_str())) {
+        ledAtual = fbdo.intData();
+        Serial.printf("LED para precisão: %d\n", ledAtual);
+    } else {
+        Serial.printf("Erro ao acessar LED: %s\n", fbdo.errorReason().c_str());
+    }
+    return ledAtual;
+}
+
+/**
+ * @brief Envia resultado completo do teste de precisão
+ * @param acerto true se foi acerto, false se erro
+ * @param tempoResposta Tempo de resposta em milissegundos
+ * @param sensorTocado Sensor que foi tocado (0-8)
+ * @param ledSorteado LED que estava aceso (1-9)
+ * @return true se enviado com sucesso, false caso contrário
+ */
+bool ConexaoManager::sendPrecisionResult(bool acerto, unsigned long tempoResposta, 
+                                        int sensorTocado, int ledSorteado) {
+    if (!isConnected()) return false;
+    
+    String path = "/devices/" + deviceId + "/medicoes";
+    FirebaseJson update;
+    
+    // Atualizar estado para concluído
+    update.set("estado", "concluida");
+    update.set("timestampConclusao", getTimestamp());
+    
+    // Adicionar resultado completo
+    FirebaseJson resultado;
+    resultado.set("acerto", acerto);
+    resultado.set("tempoResposta", tempoResposta);
+    resultado.set("sensorTocado", sensorTocado);
+    resultado.set("ledSorteado", ledSorteado);
+    
+    update.set("resultado", resultado);
+    
+    return Firebase.RTDB.updateNode(&fbdo, path.c_str(), &update);
 }
