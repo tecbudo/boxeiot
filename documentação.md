@@ -1,4 +1,4 @@
-# Documentação Completa do Sistema BoxeIoT
+# Documentação Completa do Sistema BoxeIoT - Atualizada
 
 ## Índice
 1. [Introdução](#introdução)
@@ -9,6 +9,7 @@
 6. [Diagramas Técnicos](#diagramas-técnicos)
 7. [Configuração e Implantação](#configuração-e-implantação)
 8. [Considerações de Segurança](#considerações-de-segurança)
+9. [Sincronização Site-Firmware](#sincronização-site-firmware)
 
 ## Introdução
 
@@ -75,13 +76,19 @@ root/
 │       ├── usuario: [user_id] (se ocupado)
 │       ├── timestampConexao: [timestamp]
 │       ├── medicoes/
-│       │   └── [measurement_id]/
-│       │       ├── tipo: "tempo_reacao" | "precisao" | "forca" | "tCalibrar"
-│       │       ├── estado: "solicitada" | "executando" | "concluida"
+│       │   └── ├── tipo: "tempo_reacao" | "precisao" | "forca" | "tCalibrar"
+│       │       ├── estado: "solicitada" | "executando" | "concluida" | "erro" | "completo"
 │       │       ├── usuario: [user_id]
 │       │       ├── timestamp: [timestamp]
+│       │       ├── timestampInicio: [timestamp]
 │       │       ├── valor: [number] (resultado)
-│       │       └── ledIndex: [number] (apenas para precisão)
+│       │       ├── sensor: [number] (1-9) - sensor atual sendo calibrado
+│       │       ├── ledIndex: [number] (apenas para precisão)
+│       │       ├── progresso/
+│       │       │   ├── completos: [number] (sensores já calibrados)
+│       │       │   ├── total: [number] (total de sensores)
+│       │       │   └── percentual: [number] (0-100)
+│       │       └── sensores_calibrados: [array] (lista de sensores já calibrados)
 │       └── usuarios/
 │           └── [user_id]: [timestamp] (timestamp da última conexão)
 │
@@ -235,6 +242,17 @@ sequenceDiagram
         D->>D: Mede força continuamente
         D->>F: Atualiza valor de força em tempo real
         D->>F: Registra força máxima ao final
+    else Modo Calibração
+        A->>F: Define sensor atual (1-9)
+        F->>D: Notifica sensor a calibrar
+        D->>D: Calibra sensor específico
+        D->>F: Atualiza estado e progresso
+        F->>A: Notifica conclusão
+        A->>F: Define próximo sensor (2-9)
+        loop Até todos os sensores
+            D->>D: Calibra próximo sensor
+        end
+        A->>F: Define estado como "completo"
     end
     
     F->>A: Notifica resultado final
@@ -311,13 +329,16 @@ graph TB
   "rules": {
     "users": {
       "$uid": {
+        // Apenas o próprio usuário pode ler e escrever seus dados
         ".read": "$uid === auth.uid",
         ".write": "$uid === auth.uid"
       }
     },
     "devices": {
       "$device_id": {
-        ".read": true,
+        // Qualquer usuário autenticado pode ler dados dos dispositivos
+        ".read": "auth != null",
+        // Qualquer usuário autenticado pode escrever dados dos dispositivos
         ".write": "auth != null"
       }
     }
@@ -363,4 +384,46 @@ const firebaseConfig = {
 - Implementar notificações para eventos importantes
 - Desenvolver aplicativo mobile nativo
 
-Esta documentação cobre todos os aspectos principais do sistema BoxeIoT conforme implementado atualmente. Para informações mais detalhadas sobre implementação específica, consulte os comentários no código-fonte de cada página.
+## Sincronização Site-Firmware
+
+### Problemas Resolvidos
+
+#### 1. Incompatibilidade na Numeração dos Sensores
+- **Firmware**: Utilizava índices de 0 a 8 para os sensores
+- **Interface Web**: Esperava números de 1 a 9 para os sensores
+- **Solução**: O firmware agora converte os índices (1-9 da interface para 0-8 internamente)
+
+#### 2. Falta de Campo `sensor` na Estrutura de Dados
+- Implementado campo `sensor` em `medicoes` para indicar qual sensor calibrar
+- Adicionados campos de progresso (`completos`, `total`, `percentual`)
+
+#### 3. Estrutura de Dados Incompleta
+- Adicionada estrutura completa em `medicoes` para suportar o processo de calibração
+
+#### 4. Comunicação Unidirecional
+- Implementada comunicação bidirecional com o firmware escrevendo na estrutura do Firebase
+
+### Novas Funções Implementadas
+
+#### No Firmware (Conexao.cpp):
+1. **`getSensorCalibracao()`**: Obtém o sensor atual a ser calibrado do Firebase
+2. **`setSensorCalibracao(int sensor)`**: Define o sensor atual a ser calibrado no Firebase
+3. **`updateDeviceEx()`**: Inicializa todos os campos necessários para a calibração
+4. **`sendSensorCalibrated(int sensor)`**: Notifica que um sensor foi calibrado com sucesso
+
+#### Fluxo de Calibração Atualizado:
+1. Interface web inicia calibração e define a estrutura de dados
+2. Firmware detecta comando e entra no estado de calibração
+3. Interface web define sequencialmente os sensores a calibrar (1-9)
+4. Firmware calibra cada sensor e atualiza o progresso
+5. Interface web monitora progresso e define próximo sensor
+6. Ao final, interface web define estado como "completo"
+
+### Benefícios da Nova Implementação
+
+1. **Simplicidade**: Interface web controla a sequência, firmware executa a calibração
+2. **Robustez**: Menos pontos de falha na comunicação com timeouts e tratamento de erros
+3. **Manutenibilidade**: Código mais fácil de entender e modificar
+4. **Experiência do Usuário**: Feedback visual claro sobre o andamento da calibração
+
+Esta documentação cobre todos os aspectos principais do sistema BoxeIoT, incluindo as recentes melhorias na sincronização entre a interface web e o firmware. Para informações mais detalhadas sobre implementação específica, consulte os comentários no código-fonte de cada página.
